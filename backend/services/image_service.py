@@ -25,8 +25,8 @@ def compute_hash(data: bytes) -> str:
 def correct_orientation(img: Image.Image) -> tuple[Image.Image, bool]:
     """Auto-rotate image based on EXIF orientation. Returns (image, was_corrected)."""
     try:
-        exif = img._getexif()
-        if exif is None or ORIENTATION_TAG not in exif:
+        exif = img.getexif()
+        if not exif or ORIENTATION_TAG not in exif:
             return img, False
 
         orientation = exif[ORIENTATION_TAG]
@@ -60,8 +60,8 @@ def correct_orientation(img: Image.Image) -> tuple[Image.Image, bool]:
 def extract_date_taken(img: Image.Image) -> datetime | None:
     """Extract date taken from EXIF data."""
     try:
-        exif = img._getexif()
-        if exif is None:
+        exif = img.getexif()
+        if not exif:
             return None
         # DateTimeOriginal (36867), DateTimeDigitized (36868), DateTime (306)
         for tag_id in (36867, 36868, 306):
@@ -92,10 +92,7 @@ def _rational_to_float(rational) -> float:
 def extract_gps(img: Image.Image) -> tuple[float | None, float | None]:
     """Extract GPS latitude and longitude from EXIF. Returns (lat, lon) or (None, None)."""
     try:
-        exif = img._getexif()
-        if exif is None:
-            return None, None
-        gps_info = exif.get(34853)  # GPSInfo tag
+        gps_info = img.getexif().get_ifd(34853)  # GPSInfo IFD
         if not gps_info:
             return None, None
 
@@ -121,8 +118,8 @@ def extract_gps(img: Image.Image) -> tuple[float | None, float | None]:
 def extract_camera_model(img: Image.Image) -> str | None:
     """Extract camera make + model from EXIF."""
     try:
-        exif = img._getexif()
-        if exif is None:
+        exif = img.getexif()
+        if not exif:
             return None
         make = (exif.get(271) or "").strip()
         model = (exif.get(272) or "").strip()

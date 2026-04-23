@@ -1,6 +1,7 @@
 import asyncio
 import os
 from datetime import datetime
+from io import BytesIO
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -475,6 +476,23 @@ async def get_full_image(image_id: int, db: Session = Depends(get_db)):
     }
 
     from fastapi.responses import Response
+    from PIL import Image as PILImage
+    from services.image_service import correct_orientation
+
+    try:
+        pil = PILImage.open(BytesIO(data))
+        pil, corrected = correct_orientation(pil)
+        if corrected:
+            buf = BytesIO()
+            fmt = "JPEG" if ext in ("jpg", "jpeg") else ext.upper()
+            save_kwargs = {"quality": 95, "subsampling": 0} if fmt == "JPEG" else {}
+            if pil.mode in ("RGBA", "P", "LA") and fmt == "JPEG":
+                pil = pil.convert("RGB")
+            pil.save(buf, format=fmt, **save_kwargs)
+            data = buf.getvalue()
+    except Exception:
+        pass  # serve original bytes if correction fails
+
     return Response(content=data, media_type=media_types.get(ext, "application/octet-stream"))
 
 
