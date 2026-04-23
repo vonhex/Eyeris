@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+body {
+  @apply bg-gray-950 text-gray-100;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-gray-900;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-700 rounded;
+}
+
+.input-field {
+  @apply bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 placeholder-gray-600 w-full;
+  @apply focus:outline-none focus:border-blue-500;
+}
+
+.btn-primary {
+  @apply px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition;
+}

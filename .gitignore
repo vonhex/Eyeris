@@ -1,0 +1,17 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+backend/thumbnails/*
+!backend/thumbnails/.gitkeep
+node_modules/
+frontend/dist/
+.vite/
+*.egg-info/
+venv/
+venv-*/
+.venv/
+*.pid
+a-eye-main.zip
+*.pt
+*.onnx
