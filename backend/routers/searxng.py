@@ -24,18 +24,14 @@ async def search_web(
     category: str = Query("images", pattern="^(images|videos)$")
 ):
     """Search images or videos via SearXNG."""
-    if category == "images":
-        engines = "google images"
-    else:
-        engines = "google videos"
     params = {
         "q": q,
         "format": "json",
         "categories": category,
-        "engines": engines,
         "pageno": page,
         "safesearch": 0,
     }
+    allowed_engines = {"startpage images", "bing images"} if category == "images" else {"google videos", "bing videos", "youtube"}
     if not settings.SEARXNG_URL:
         raise HTTPException(status_code=503, detail="SearXNG URL not configured")
     async with httpx.AsyncClient(timeout=20) as client:
@@ -50,6 +46,8 @@ async def search_web(
     data = resp.json()
     results = []
     for r in data.get("results", []):
+        if r.get("engine") not in allowed_engines:
+            continue
         if category == "images":
             img_src = r.get("img_src") or r.get("url")
             thumb = r.get("thumbnail_src") or r.get("thumbnail") or img_src
