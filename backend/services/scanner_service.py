@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from database import SessionLocal
-from models import Image, Tag, ImageTag, Category, ImageCategory, Face, ScanJob, ImageTagBlock
+from models import Image, Tag, ImageTag, Face, ScanJob, ImageTagBlock
 from services.smb_service import list_images, read_file_bytes, move_file, delete_file, _local_path
 from services.image_service import process_image_bytes, compute_hash, parse_xmp_metadata, generate_thumbnail
 from services.search_service import index_image as es_index_image
@@ -375,11 +375,9 @@ async def _discover_image(db: Session, img_info: dict):
             dupe.analyzed = True  # Always True now
             db.commit()
 
-            # Local AI analysis (faces and high-level category)
             local_analysis = await asyncio.to_thread(analyze_image_local, data)
             if not dupe.faces:
                 _save_faces(db, dupe, local_analysis["faces"], img_pil)
-            _save_category(db, dupe, local_analysis["category"])
 
             # Load XMP tags if present (this also handles ES indexing)
             await _load_xmp_for_image(db, dupe)
@@ -426,48 +424,12 @@ async def _discover_image(db: Session, img_info: dict):
     img_record.analyzed = True
     db.commit()
 
-    # Local AI analysis (faces and high-level category)
     local_analysis = await asyncio.to_thread(analyze_image_local, data)
     _save_faces(db, img_record, local_analysis["faces"], img_pil)
-    _save_category(db, img_record, local_analysis["category"])
 
     # Load XMP tags if present (this also handles ES indexing)
     await _load_xmp_for_image(db, img_record)
 
-
-def _save_category(db: Session, img_record: Image, cat_name: str | None):
-    """Assign a primary category to the image."""
-    if not cat_name:
-        return
-
-    # 1. Get or create category
-    category = db.query(Category).filter(Category.name == cat_name).first()
-    if not category:
-        try:
-            category = Category(name=cat_name)
-            db.add(category)
-            db.flush()
-        except Exception:
-            db.rollback()
-            category = db.query(Category).filter(Category.name == cat_name).first()
-
-    if category:
-        # 2. Check if already linked
-        exists = db.query(ImageCategory).filter(
-            ImageCategory.image_id == img_record.id,
-            ImageCategory.category_id == category.id
-        ).first()
-        
-        if not exists:
-            try:
-                # Remove existing primary category link if any
-                db.query(ImageCategory).filter(ImageCategory.image_id == img_record.id).delete()
-                db.add(ImageCategory(image_id=img_record.id, category_id=category.id))
-                db.flush()
-            except Exception:
-                db.rollback()
-
-    db.commit()
 
 
 def _save_faces(db: Session, img_record: Image, face_data: list[dict], img_pil=None):
@@ -690,8 +652,6 @@ async def run_full_resync() -> int:
                     local_analysis = await asyncio.to_thread(analyze_image_local, data)
                     if not img_record.faces:
                         _save_faces(db, img_record, local_analysis["faces"], img_pil)
-                    if not img_record.categories:
-                        _save_category(db, img_record, local_analysis["category"])
             except Exception as e:
                 print(f"[Resync] Error for {img_record.file_path}: {e}")
 

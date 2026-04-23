@@ -10,10 +10,7 @@ python-dotenv
 python-multipart
 torch
 torchvision
-nudenet
 ultralytics
-transformers
-sentencepiece
 facenet-pytorch
 scipy
 reverse_geocode

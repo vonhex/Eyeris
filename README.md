@@ -1,58 +1,55 @@
 # Eyeris
 
-> Self-hosted AI photo manager with A-EYE Docker integration — scans NAS shares, detects faces, auto-tags content, and organizes your collection with local vision models.
+> Self-hosted photo manager with A-EYE integration — scans NAS shares, ingests AI-generated tags and descriptions, groups faces, and organizes your collection.
 
-Eyeris is a full-stack, self-hosted image management platform built for large personal or home-lab photo libraries stored on NAS/SMB storage. It runs entirely on-premises using local AI models — no cloud dependency.
+Eyeris is a full-stack, self-hosted image management platform for large personal or home-lab photo libraries stored on NAS/SMB storage. It handles discovery, deduplication, metadata extraction, face grouping, and browsing. AI analysis (descriptions, tags, categories, sentiment) is provided by **A-EYE**, a separate tool you run yourself that writes XMP sidecar files back to the NAS. Eyeris picks those up automatically during each scan.
+
+---
+
+## How A-EYE fits in
+
+A-EYE is set up independently by the user (outside of Eyeris). It processes images on the NAS and writes `.xmp` sidecar files alongside them containing AI-generated descriptions, tags, and album names. During each scan, Eyeris reads those sidecars and ingests their content into the database — no configuration needed on the Eyeris side beyond having the NAS shares mounted.
+
+```
+NAS share
+├── photo.jpg          ← discovered and indexed by Eyeris
+└── photo.jpg.xmp      ← written by A-EYE, ingested by Eyeris on next scan
+```
 
 ---
 
 ## Features
 
 - **Automatic NAS scanning** — Recursively discovers images across SMB/CIFS shares
-- **Two-phase AI pipeline** — Fast GPU models in Phase 1, rich Gemma 4 vision analysis in Phase 2
-- **Face detection & clustering** — YOLOv8 face detection + FaceNet embeddings grouped by person
-- **NSFW detection** — NudeNet-powered detection with automatic NAS folder quarantine
-- **Smart tagging** — SigLIP zero-shot classification against ~300 candidate tags
-- **AI descriptions** — Gemma 4 vision generates natural-language descriptions, categories, albums, and sentiment
-- **Semantic search** — LLM query expansion for natural language photo discovery
+- **A-EYE tag ingestion** — Reads XMP sidecars written by A-EYE (descriptions, tags, albums)
+- **Face detection & grouping** — Detects faces with YOLOv8, extracts FaceNet embeddings, clusters into people
 - **Duplicate detection** — SHA-256 deduplication + perceptual hash visual similarity grouping
 - **EXIF & GPS metadata** — Date taken, camera model, GPS coordinates with reverse geocoding
-- **XMP sidecar support** — Loads tags and descriptions from `.xmp` sidecars
+- **Semantic search** — Weighted keyword search across filenames, AI descriptions, and tags
 - **Real-time file watching** — Detects new images on the NAS immediately
 - **Hardware monitoring** — Live CPU, GPU (NVIDIA + AMD), and RAM stats
-- **A-EYE Docker integration** — Drop-in Docker setup for the AI inference layer
+- **Web image search** — SearXNG proxy with direct-to-NAS download
 
 ---
 
 ## Architecture
 
-### Two-Phase Scan Pipeline
+### Scan Pipeline
 
-The scanner (`backend/services/scanner_service.py`) runs as a persistent `asyncio` background task. Both phases run **concurrently** — Phase 2 starts consuming images as soon as Phase 1 produces them.
+The scanner (`backend/services/scanner_service.py`) runs as a persistent `asyncio` background task.
 
-**Phase 1 — Discovery:**
-- Lists all SMB shares in parallel
-- Downloads new images, computes SHA-256 hash
-- Deduplicates (keeps higher-quality copy by file size + EXIF completeness)
-- Generates 300×300 JPEG thumbnails
-- Runs fast GPU models: NudeNet (NSFW), YOLOv8-face, FaceNet embeddings, SigLIP tags
-- Loads XMP sidecar metadata
+**Discovery (per image):**
+1. List all SMB shares in parallel
+2. Download new images, compute SHA-256 hash
+3. Deduplicate (keep higher-quality copy by file size + EXIF completeness)
+4. Extract EXIF, GPS, camera model; apply orientation correction
+5. Generate 300×300 JPEG thumbnail
+6. Run face detection (YOLOv8) + FaceNet embedding extraction
+7. Check for `.xmp` sidecar — if present, load description, tags, and album into DB
 
-**Phase 2 — AI Analysis:**
-- Sends images to Gemma 4 vision (via LM Studio or Ollama)
-- Returns: description, tags, category, album, faces, sentiment score, NSFW flag
-- Concurrency capped by `SCAN_CONCURRENCY` semaphore
+### Face Grouping
 
-### Dual AI Architecture
-
-| Layer | Models | Runs On | Purpose |
-|---|---|---|---|
-| Fast GPU | NudeNet, YOLOv8n-face, FaceNet, SigLIP | RTX/AMD GPU (Phase 1) | NSFW detection, face bounding boxes, embeddings, zero-shot tags |
-| Vision LLM | Gemma 4 via llama.cpp / Ollama | LM Studio server (Phase 2) | Descriptions, rich tags, categories, albums, sentiment |
-
-### Face Clustering
-
-Faces accumulate 512-d FaceNet embeddings stored in the database. `POST /api/faces/cluster` runs a union-find algorithm with cosine similarity (default threshold: 0.65) to group faces into person clusters. Each cluster can be named and merged via the UI.
+Faces accumulate 512-d FaceNet embeddings stored in the database. `POST /api/faces/cluster` runs a union-find algorithm with cosine similarity (default threshold: 0.65) to group faces into person clusters. Each cluster can be named and merged via the People page in the UI.
 
 ### Backend
 
@@ -74,12 +71,11 @@ backend/
 │   ├── settings.py          # Read/update .env via API
 │   └── searxng.py           # Web image search proxy + NAS download
 └── services/
-    ├── scanner_service.py   # Two-phase scan pipeline
-    ├── gpu_models.py        # YOLOv8-face, FaceNet, SigLIP inference
-    ├── ai_service.py        # Gemma 4 vision (LM Studio / Ollama)
+    ├── scanner_service.py   # Scan pipeline and XMP ingestion
+    ├── gpu_models.py        # YOLOv8-face + FaceNet inference
     ├── image_service.py     # EXIF, orientation, thumbnails, hashing
     ├── smb_service.py       # SMB/CIFS file I/O
-    ├── llm_search.py        # LLM query expansion + weighted DB search
+    ├── llm_search.py        # Weighted keyword search
     ├── search_service.py    # Elasticsearch integration (optional)
     └── watcher_service.py   # Real-time NAS file watcher
 ```
@@ -170,7 +166,6 @@ SMB_HOST=192.168.1.x
 SMB_USERNAME=your_nas_user
 SMB_PASSWORD=your_nas_password
 SMB_SHARES=photos,media         # comma-separated share names
-NSFW_FOLDERS=photos             # shares whose images are checked for NSFW auto-move
 
 # MariaDB
 DB_HOST=localhost
@@ -179,16 +174,8 @@ DB_USER=eyeris
 DB_PASSWORD=your_db_password
 DB_NAME=eyeris
 
-# AI — LM Studio (default)
-LLAMA_CPP_URL=http://localhost:1234
-LMSTUDIO_MODEL=gemma-4
-
-# AI — Ollama (alternative, takes precedence if set)
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=gemma3:12b
-
 # Scanner
-SCAN_CONCURRENCY=2              # parallel Phase 2 AI workers
+SCAN_CONCURRENCY=2              # parallel scan workers
 SCAN_INTERVAL_MINUTES=60        # auto-scan frequency
 
 # Scheduled scanning (optional)
@@ -217,8 +204,7 @@ Settings can also be updated at runtime via `PUT /api/settings` (persisted back 
 - Node.js 18+ and npm
 - MariaDB or MySQL
 - SMB/CIFS-accessible NAS storage
-- LM Studio with Gemma 4 **or** Ollama with a compatible vision model
-- NVIDIA or AMD GPU recommended (falls back to CPU)
+- A-EYE (set up separately — see [A-EYE](https://github.com/vonhex/A-EYE))
 
 ### 1. Clone & configure
 
@@ -272,16 +258,12 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 | `http://localhost:8000` | Backend API (also serves built frontend in production) |
 | `http://localhost:8000/docs` | Swagger API docs |
 
-### 6. A-EYE Docker Integration
-
-Eyeris supports the A-EYE Docker stack for running the AI inference layer (LM Studio / llama.cpp) as a containerized service. See the `A-EYE/` directory for the Docker Compose setup and configuration.
-
 ---
 
 ## Development
 
 ```bash
-# Backend hot-reload
+# Backend
 source venv/bin/activate
 cd backend
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -294,8 +276,6 @@ npm run dev
 cd frontend
 npm run lint
 ```
-
-> **Note:** The `--reload` flag on uvicorn does not work reliably in this environment. For backend changes in production, use `restart-backend.sh`.
 
 ### Database Migrations
 
@@ -310,11 +290,10 @@ No migration tool needed. `main.py` runs inline SQL `ALTER TABLE` statements on 
 | Backend | FastAPI, SQLAlchemy, Uvicorn |
 | Database | MariaDB / MySQL |
 | Frontend | React, Vite, Tailwind CSS, Axios |
-| AI (Phase 1) | NudeNet, YOLOv8n-face, FaceNet (facenet-pytorch), SigLIP |
-| AI (Phase 2) | Gemma 4 via LM Studio (llama.cpp) or Ollama |
+| Face detection | YOLOv8n-face + FaceNet (facenet-pytorch) |
+| AI tagging | A-EYE (external, via XMP sidecars) |
 | Storage | SMB/CIFS (QNAP NAS or compatible) |
-| Search | LLM query expansion + SQL weighted search; Elasticsearch optional |
-| Containerization | Docker (A-EYE integration) |
+| Search | Weighted SQL keyword search; Elasticsearch optional |
 
 ---
 

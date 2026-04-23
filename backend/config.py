@@ -26,16 +26,6 @@ class Settings:
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 
-    # llama.cpp / LM Studio (primary AI backend)
-    LLAMA_CPP_URL: str = os.getenv("LLAMA_CPP_URL", "http://10.0.1.98:8080")
-    LMSTUDIO_MODEL: str = os.getenv("LMSTUDIO_MODEL", "")
-
-    # Ollama (alternative AI backend — set OLLAMA_URL to enable)
-    # When set, Ollama is used instead of LM Studio for Phase 2 AI analysis.
-    # Example: OLLAMA_URL=http://localhost:11434  OLLAMA_MODEL=gemma3:12b
-    OLLAMA_URL: str = os.getenv("OLLAMA_URL", "")
-    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "gemma3:12b")
-
     # Scanner
     SCAN_CONCURRENCY: int = int(os.getenv("SCAN_CONCURRENCY", "2"))
     SCAN_INTERVAL_MINUTES: int = int(os.getenv("SCAN_INTERVAL_MINUTES", "60"))
