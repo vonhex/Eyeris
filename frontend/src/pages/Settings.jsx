@@ -33,6 +33,7 @@ export default function Settings() {
         scan_schedule_enabled: settings.scan_schedule_enabled || false,
         scan_schedule_start: settings.scan_schedule_start || "22:00",
         scan_schedule_end: settings.scan_schedule_end || "06:00",
+        aeye_url: settings.aeye_url || "",
       }
       if (smbPassword) payload.smb_password = smbPassword
       await updateSettings(payload)
@@ -186,6 +187,25 @@ export default function Settings() {
             </Field>
           </div>
         )}
+      </Section>
+
+      {/* Integrations */}
+      <Section title="Integrations">
+        <Field label="A-EYE URL">
+          <input
+            type="text"
+            value={settings.aeye_url || ""}
+            onChange={(e) => setSettings({ ...settings, aeye_url: e.target.value })}
+            placeholder="http://your-aeye-host:8000"
+            className="input-field"
+          />
+          <p className="text-xs text-gray-600 mt-1">
+            Used to display A-EYE processing status on the dashboard.{" "}
+            <a href="https://github.com/SpaceinvaderOne/a-eye" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+              What is A-EYE?
+            </a>
+          </p>
+        </Field>
       </Section>
 
       {/* Save */}

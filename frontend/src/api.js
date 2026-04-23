@@ -54,3 +54,4 @@ export const deleteSmartAlbum = (id) => api.delete(`/smart-albums/${id}`).then((
 export const searxngSearch = (q, page = 1, category = "images") => api.get("/searxng/search", { params: { q, page, category } }).then((r) => r.data)
 export const searxngDownload = (urls, share, subfolder) => api.post("/searxng/download", { urls, share, subfolder }).then((r) => r.data)
 export const searxngProxyUrl = (url) => `/api/searxng/proxy?url=${encodeURIComponent(url)}`
+export const getAeyeStatus = () => api.get("/aeye/status").then((r) => r.data)

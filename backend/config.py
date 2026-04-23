@@ -26,6 +26,9 @@ class Settings:
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 
+    # A-EYE integration
+    AEYE_URL: str = os.getenv("AEYE_URL", "")
+
     # Scanner
     SCAN_CONCURRENCY: int = int(os.getenv("SCAN_CONCURRENCY", "2"))
     SCAN_INTERVAL_MINUTES: int = int(os.getenv("SCAN_INTERVAL_MINUTES", "60"))
