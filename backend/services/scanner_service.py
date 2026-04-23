@@ -13,6 +13,7 @@ from models import Image, Tag, ImageTag, Face, ScanJob, ImageTagBlock
 from services.smb_service import list_images, read_file_bytes, move_file, delete_file, _local_path
 from services.image_service import process_image_bytes, compute_hash, parse_xmp_metadata, generate_thumbnail
 from services.search_service import index_image as es_index_image
+
 from services.gpu_models import analyze_image_local
 
 # Module-level state for the background scanner
@@ -571,24 +572,8 @@ async def _load_xmp_for_image(db: Session, img_record: Image):
 
 
 def _index_in_es(img_record: Image):
-    """Index or re-index the image in Elasticsearch."""
-    try:
-        tag_names = [it.tag.name for it in img_record.tags]
-        cat_names = [ic.category.name for ic in img_record.categories]
-        es_index_image(
-            image_id=img_record.id,
-            filename=img_record.filename,
-            source_folder=img_record.source_folder,
-            ai_description=img_record.ai_description,
-            tags=tag_names,
-            categories=cat_names,
-            date_taken=img_record.date_taken,
-            width=img_record.width,
-            height=img_record.height,
-            analyzed=img_record.analyzed,
-        )
-    except Exception as e:
-        print(f"[ES] Index error for {img_record.file_path}: {e}")
+    """No-op — Elasticsearch removed in favor of SearXNG search."""
+    pass
 
 
 def _get_blocked_tags(db: Session, image_id: int) -> set:

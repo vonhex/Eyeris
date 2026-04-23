@@ -10,7 +10,6 @@ from database import engine, Base
 from routers import images, tags, categories, scan, stats, albums, faces, settings as settings_router, searxng
 from services.scanner_service import start_background_scanner
 from services.watcher_service import start_watcher
-from services.search_service import ensure_index as es_ensure_index
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
@@ -81,11 +80,6 @@ async def lifespan(app: FastAPI):
                 print("[Startup] Added images.quality_flags")
     except Exception as e:
         print(f"[Startup] Image migration: {e}")
-    try:
-        es_ensure_index()
-        print("[Startup] Elasticsearch index ready")
-    except Exception as e:
-        print(f"[Startup] Elasticsearch not available: {e}")
     await start_background_scanner()
     print("[Startup] Background scanner started")
     await start_watcher()
@@ -128,7 +122,7 @@ def health():
 
 @app.post("/api/reindex")
 def reindex():
-    """Reindex all images in Elasticsearch."""
+    """Reindex all images (no-op — ES removed)."""
     from database import SessionLocal
     db = SessionLocal()
     try:

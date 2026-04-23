@@ -9,7 +9,6 @@ New file flow:
   1. inotify fires on file creation
   2. 3-second debounce (NAS writes can be multi-step)
   3. _discover_image: download → hash → dedup → thumbnail → metadata & XMP tags
-  4. ES Indexing: Immediately pushes to Elasticsearch for searchability
 """
 
 import asyncio

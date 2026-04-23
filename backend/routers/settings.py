@@ -28,7 +28,6 @@ def _write_env(env: dict[str, str]):
         ("# MariaDB", ["DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME"]),
         ("# Scanner settings", ["SCAN_CONCURRENCY", "SCAN_INTERVAL_MINUTES"]),
         ("# Scheduled processing window", ["SCAN_SCHEDULE_ENABLED", "SCAN_SCHEDULE_START", "SCAN_SCHEDULE_END"]),
-        ("# Elasticsearch", ["ES_HOST", "ES_INDEX"]),
         ("# SearXNG integration", ["SEARXNG_URL"]),
     ]
     written_keys = set()

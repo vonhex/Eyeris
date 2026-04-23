@@ -40,10 +40,6 @@ class Settings:
     SCAN_SCHEDULE_START: str = os.getenv("SCAN_SCHEDULE_START", "22:00")
     SCAN_SCHEDULE_END: str = os.getenv("SCAN_SCHEDULE_END", "06:00")
 
-    # Elasticsearch
-    ES_HOST: str = os.getenv("ES_HOST", "http://10.0.1.106:9200")
-    ES_INDEX: str = os.getenv("ES_INDEX", "image_catalog")
-
     # Thumbnails
     THUMBNAIL_DIR: str = os.path.join(os.path.dirname(__file__), "thumbnails")
     THUMBNAIL_SIZE: tuple[int, int] = (300, 300)
