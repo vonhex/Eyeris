@@ -28,6 +28,8 @@ class Settings:
 
     # A-EYE integration
     AEYE_URL: str = os.getenv("AEYE_URL", "")
+    AEYE_USERNAME: str = os.getenv("AEYE_USERNAME", "")
+    AEYE_PASSWORD: str = os.getenv("AEYE_PASSWORD", "")
 
     # SearXNG integration
     SEARXNG_URL: str = os.getenv("SEARXNG_URL", "")

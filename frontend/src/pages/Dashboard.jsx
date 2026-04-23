@@ -234,6 +234,10 @@ function AeyeCard({ aeye }) {
             {aeye.llm_model && <span>LLM: <span className="text-gray-300">{aeye.llm_model}</span></span>}
           </div>
 
+          {!aeye.auth_configured && (
+            <p className="text-xs text-yellow-600">Add A-EYE username &amp; password in Settings to see processing stats.</p>
+          )}
+
           {/* Counts */}
           {(aeye.total_images != null || aeye.processed != null) && (
             <div className="grid grid-cols-3 gap-2">

@@ -9,6 +9,7 @@ export default function Settings() {
   const [message, setMessage] = useState(null)
   const [newShare, setNewShare] = useState("")
   const [smbPassword, setSmbPassword] = useState("")
+  const [aeyePassword, setAeyePassword] = useState("")
 
   useEffect(() => {
     getSettings()
@@ -34,12 +35,15 @@ export default function Settings() {
         scan_schedule_start: settings.scan_schedule_start || "22:00",
         scan_schedule_end: settings.scan_schedule_end || "06:00",
         aeye_url: settings.aeye_url || "",
+        aeye_username: settings.aeye_username || "",
         searxng_url: settings.searxng_url || "",
       }
       if (smbPassword) payload.smb_password = smbPassword
+      if (aeyePassword) payload.aeye_password = aeyePassword
       await updateSettings(payload)
       setMessage({ type: "success", text: "Settings saved. Restart scan for changes to take effect." })
       setSmbPassword("")
+      setAeyePassword("")
     } catch (err) {
       setMessage({ type: "error", text: "Failed to save settings" })
     }
@@ -206,6 +210,24 @@ export default function Settings() {
               What is A-EYE?
             </a>
           </p>
+        </Field>
+        <Field label="A-EYE Username">
+          <input
+            type="text"
+            value={settings.aeye_username || ""}
+            onChange={(e) => setSettings({ ...settings, aeye_username: e.target.value })}
+            placeholder="Your A-EYE login username"
+            className="input-field"
+          />
+        </Field>
+        <Field label="A-EYE Password">
+          <input
+            type="password"
+            value={aeyePassword}
+            onChange={(e) => setAeyePassword(e.target.value)}
+            placeholder="Leave blank to keep current"
+            className="input-field"
+          />
         </Field>
         <Field label="SearXNG URL">
           <input

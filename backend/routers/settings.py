@@ -29,7 +29,7 @@ def _write_env(env: dict[str, str]):
         ("# Scanner settings", ["SCAN_CONCURRENCY", "SCAN_INTERVAL_MINUTES"]),
         ("# Scheduled processing window", ["SCAN_SCHEDULE_ENABLED", "SCAN_SCHEDULE_START", "SCAN_SCHEDULE_END"]),
         ("# Elasticsearch", ["ES_HOST", "ES_INDEX"]),
-        ("# A-EYE integration", ["AEYE_URL"]),
+        ("# A-EYE integration", ["AEYE_URL", "AEYE_USERNAME", "AEYE_PASSWORD"]),
         ("# SearXNG integration", ["SEARXNG_URL"]),
     ]
     written_keys = set()
@@ -61,6 +61,7 @@ class SettingsResponse(BaseModel):
     scan_schedule_start: str
     scan_schedule_end: str
     aeye_url: str
+    aeye_username: str
     searxng_url: str
 
 
@@ -75,6 +76,8 @@ class SettingsUpdate(BaseModel):
     scan_schedule_start: str | None = None
     scan_schedule_end: str | None = None
     aeye_url: str | None = None
+    aeye_username: str | None = None
+    aeye_password: str | None = None
     searxng_url: str | None = None
 
 
@@ -90,6 +93,7 @@ def get_settings():
         scan_schedule_start=settings.SCAN_SCHEDULE_START,
         scan_schedule_end=settings.SCAN_SCHEDULE_END,
         aeye_url=settings.AEYE_URL,
+        aeye_username=settings.AEYE_USERNAME,
         searxng_url=settings.SEARXNG_URL,
     )
 
@@ -149,6 +153,16 @@ def update_settings(body: SettingsUpdate):
         env["AEYE_URL"] = body.aeye_url
         settings.AEYE_URL = body.aeye_url
         changed.append("AEYE_URL")
+
+    if body.aeye_username is not None:
+        env["AEYE_USERNAME"] = body.aeye_username
+        settings.AEYE_USERNAME = body.aeye_username
+        changed.append("AEYE_USERNAME")
+
+    if body.aeye_password is not None and body.aeye_password != "":
+        env["AEYE_PASSWORD"] = body.aeye_password
+        settings.AEYE_PASSWORD = body.aeye_password
+        changed.append("AEYE_PASSWORD")
 
     if body.searxng_url is not None:
         env["SEARXNG_URL"] = body.searxng_url

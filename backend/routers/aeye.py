@@ -7,9 +7,45 @@ router = APIRouter(prefix="/api/aeye", tags=["aeye"])
 
 TIMEOUT = httpx.Timeout(8.0, connect=3.0)
 
+_cached_token: str | None = None
+
+
+async def _get_token(client: httpx.AsyncClient, url: str) -> str | None:
+    global _cached_token
+    if not settings.AEYE_USERNAME or not settings.AEYE_PASSWORD:
+        return None
+    try:
+        r = await client.post(
+            f"{url}/api/login",
+            json={"username": settings.AEYE_USERNAME, "password": settings.AEYE_PASSWORD},
+        )
+        if r.status_code == 200:
+            data = r.json()
+            token = data.get("access_token") or data.get("token")
+            _cached_token = token
+            return token
+    except Exception:
+        pass
+    return None
+
+
+async def _authed_get(client: httpx.AsyncClient, url: str, path: str):
+    global _cached_token
+    headers = {}
+    if _cached_token:
+        headers["Authorization"] = f"Bearer {_cached_token}"
+    r = await client.get(f"{url}{path}", headers=headers)
+    if r.status_code == 401:
+        # Token expired or invalid — re-login
+        token = await _get_token(client, url)
+        if token:
+            r = await client.get(f"{url}{path}", headers={"Authorization": f"Bearer {token}"})
+    return r if r.status_code == 200 else None
+
 
 @router.get("/status")
 async def get_aeye_status():
+    global _cached_token
     url = settings.AEYE_URL.rstrip("/") if settings.AEYE_URL else ""
     if not url:
         return {"configured": False}
@@ -25,12 +61,15 @@ async def get_aeye_status():
         except Exception as e:
             return {"configured": True, "connected": False, "error": str(e)}
 
-        try:
-            r = await client.get(f"{url}/api/dashboard/status")
-            if r.status_code == 200:
-                dashboard = r.json()
-        except Exception:
-            pass
+        # Try authenticated endpoints
+        if not _cached_token and settings.AEYE_USERNAME and settings.AEYE_PASSWORD:
+            await _get_token(client, url)
+
+        for path in ("/api/dashboard/status", "/api/stats", "/api/status"):
+            resp = await _authed_get(client, url, path)
+            if resp is not None:
+                dashboard = resp.json()
+                break
 
     result: dict = {"configured": True, "connected": True, "url": url}
 
@@ -39,9 +78,9 @@ async def get_aeye_status():
         ollama = health.get("ollama") or {}
         result["ollama_connected"] = ollama.get("connected") if ollama else health.get("ollama_connected")
         result["ollama_host"] = ollama.get("host") if ollama else health.get("ollama_host")
-        result["vision_model"] = (ollama.get("vision_model") if ollama else None) or health.get("vision_model") or health.get("configured_vision_model")
-        result["llm_model"] = (ollama.get("llm_model") if ollama else None) or health.get("llm_model") or health.get("configured_llm_model")
-        models = (ollama.get("models") if ollama else None) or health.get("available_models") or health.get("models") or []
+        result["vision_model"] = (ollama.get("vision_model") if ollama else None) or health.get("vision_model")
+        result["llm_model"] = (ollama.get("llm_model") if ollama else None) or health.get("llm_model")
+        models = (ollama.get("models") if ollama else None) or health.get("available_models") or []
         result["available_models"] = models if isinstance(models, list) else []
 
     if dashboard:
@@ -58,6 +97,7 @@ async def get_aeye_status():
         result["queue_depth"] = (
             worker.get("queue_depth") if isinstance(worker, dict) else None
         ) or dashboard.get("queue_depth")
-        result["scanning"] = dashboard.get("scanning") or dashboard.get("scan_active", False)
+
+    result["auth_configured"] = bool(settings.AEYE_USERNAME and settings.AEYE_PASSWORD)
 
     return result
