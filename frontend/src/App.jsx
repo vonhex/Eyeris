@@ -10,6 +10,7 @@ import Settings from "./pages/Settings"
 import ImageSearch from "./pages/ImageSearch"
 import ScanHistory from "./pages/ScanHistory"
 import Duplicates from "./pages/Duplicates"
+import Blurry from "./pages/Blurry"
 import { getScanStatus, stopScan } from "./api"
 
 const navItems = [
@@ -19,6 +20,7 @@ const navItems = [
   { to: "/tags", label: "Tags" },
   { to: "/folders", label: "Folders" },
   { to: "/duplicates", label: "Duplicates" },
+  { to: "/blurry", label: "Blurry" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/scan-history", label: "Scan History" },
   { to: "/search", label: "Web Search" },
@@ -100,6 +102,7 @@ function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/scan-history" element={<ScanHistory />} />
             <Route path="/duplicates" element={<Duplicates />} />
+            <Route path="/blurry" element={<Blurry />} />
           </Routes>
         </main>
       </div>

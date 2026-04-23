@@ -246,7 +246,6 @@ def process_image_bytes(data: bytes) -> dict:
     gps_lat, gps_lon = extract_gps(original)
     camera_model = extract_camera_model(original)
 
-    # No analysis performed in Viewer-only mode
     location_name = None
     quality_flags = json.dumps({"blur": False, "blur_score": 0.0, "overexposed": False, "underexposed": False})
 
