@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { getStats, getScanStatus, startScan, stopScan, startPhashScan, getAeyeStatus } from "../api"
+import { getStats, getScanStatus, startScan, stopScan, startPhashScan } from "../api"
 import ScanProgress from "../components/ScanProgress"
 import HardwareStats from "../components/HardwareStats"
 
@@ -8,18 +8,15 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [scanJob, setScanJob] = useState(null)
-  const [aeye, setAeye] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     getStats().then(setStats).catch(() => null).finally(() => setLoading(false))
     getScanStatus().then(setScanJob).catch(() => {})
-    getAeyeStatus().then(setAeye).catch(() => {})
 
     const interval = setInterval(() => {
       getStats().then(setStats).catch(() => {})
       getScanStatus().then(setScanJob).catch(() => {})
-      getAeyeStatus().then(setAeye).catch(() => {})
     }, 5000)
     return () => clearInterval(interval)
   }, [])
@@ -47,9 +44,6 @@ export default function Dashboard() {
 
       {/* Duplicate scan status */}
       <DuplicateScanCard scanJob={scanJob} stats={stats} onNavigate={() => navigate("/duplicates")} />
-
-      {/* A-EYE status */}
-      {aeye && aeye.configured && <AeyeCard aeye={aeye} />}
 
       {/* Live hardware stats */}
       <HardwareStats />
@@ -200,94 +194,6 @@ function StatCard({ label, value }) {
     <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
       <p className="text-2xl font-bold text-white">{value?.toLocaleString()}</p>
       <p className="text-xs text-gray-500 mt-1">{label}</p>
-    </div>
-  )
-}
-
-function AeyeCard({ aeye }) {
-  const connected = aeye.connected !== false
-  const pct = aeye.progress_pct != null ? Math.min(100, Math.round(aeye.progress_pct)) : null
-  const workerBusy = aeye.worker_state && aeye.worker_state !== "idle" && aeye.worker_state !== "stopped"
-
-  return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-gray-300">A-EYE</h3>
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-          !connected ? "bg-red-900/50 text-red-400" :
-          aeye.ollama_connected === false ? "bg-yellow-900/50 text-yellow-400" :
-          "bg-green-900/50 text-green-400"
-        }`}>
-          {!connected ? "Unreachable" : aeye.ollama_connected === false ? "Ollama offline" : "Online"}
-        </span>
-      </div>
-
-      {!connected && aeye.error && (
-        <p className="text-xs text-red-400">{aeye.error}</p>
-      )}
-
-      {connected && (
-        <div className="space-y-2">
-          {/* Models */}
-          <div className="flex gap-4 text-xs text-gray-500">
-            {aeye.vision_model && <span>Vision: <span className="text-gray-300">{aeye.vision_model}</span></span>}
-            {aeye.llm_model && <span>LLM: <span className="text-gray-300">{aeye.llm_model}</span></span>}
-          </div>
-
-          {!aeye.auth_configured && (
-            <p className="text-xs text-yellow-600">Add A-EYE username &amp; password in Settings to see processing stats.</p>
-          )}
-
-          {/* Counts */}
-          {(aeye.total_images != null || aeye.processed != null) && (
-            <div className="grid grid-cols-3 gap-2">
-              {aeye.total_images != null && (
-                <div className="bg-gray-800 rounded px-2 py-1.5 text-center">
-                  <p className="text-sm font-semibold text-white">{aeye.total_images?.toLocaleString()}</p>
-                  <p className="text-xs text-gray-500">Total</p>
-                </div>
-              )}
-              {aeye.processed != null && (
-                <div className="bg-gray-800 rounded px-2 py-1.5 text-center">
-                  <p className="text-sm font-semibold text-green-400">{aeye.processed?.toLocaleString()}</p>
-                  <p className="text-xs text-gray-500">Processed</p>
-                </div>
-              )}
-              {aeye.pending != null && (
-                <div className="bg-gray-800 rounded px-2 py-1.5 text-center">
-                  <p className="text-sm font-semibold text-yellow-400">{aeye.pending?.toLocaleString()}</p>
-                  <p className="text-xs text-gray-500">Pending</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Progress bar */}
-          {pct != null && (
-            <div>
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>{workerBusy ? `Processing · ${aeye.worker_state}` : "Idle"}</span>
-                <span>{pct}%</span>
-              </div>
-              <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
-                <div
-                  className={`h-1.5 rounded-full transition-all duration-500 ${workerBusy ? "bg-blue-500" : "bg-green-600"}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Queue depth */}
-          {aeye.queue_depth != null && aeye.queue_depth > 0 && (
-            <p className="text-xs text-gray-500">Queue: <span className="text-gray-300">{aeye.queue_depth} items</span></p>
-          )}
-
-          {aeye.errors != null && aeye.errors > 0 && (
-            <p className="text-xs text-red-400">{aeye.errors} error{aeye.errors !== 1 ? "s" : ""}</p>
-          )}
-        </div>
-      )}
     </div>
   )
 }

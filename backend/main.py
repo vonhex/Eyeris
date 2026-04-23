@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from database import engine, Base
-from routers import images, tags, categories, scan, stats, albums, faces, settings as settings_router, searxng, aeye
+from routers import images, tags, categories, scan, stats, albums, faces, settings as settings_router, searxng
 from services.scanner_service import start_background_scanner
 from services.watcher_service import start_watcher
 from services.search_service import ensure_index as es_ensure_index
@@ -119,7 +119,6 @@ app.include_router(albums.router)
 app.include_router(faces.router)
 app.include_router(settings_router.router)
 app.include_router(searxng.router)
-app.include_router(aeye.router)
 
 
 @app.get("/api/health")

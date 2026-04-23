@@ -15,3 +15,9 @@ venv-*/
 a-eye-main.zip
 *.pt
 *.onnx
+*.mp4
+GEMINI.md
+CLAUDE.md
+QWEN.md
+.claude/
+.qwen/
