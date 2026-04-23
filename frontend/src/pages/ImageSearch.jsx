@@ -341,6 +341,22 @@ function SearchResult({ result, selected, onToggle, onExpand }) {
         </svg>
       </button>
 
+      {/* Visit source button */}
+      {(result.page_url || result.url) && (
+        <a
+          href={result.page_url || result.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute top-1.5 left-9 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white"
+          onClick={(e) => e.stopPropagation()}
+          title="Visit source website"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
+      )}
+
       {/* Checkbox indicator */}
       <div className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${
         selected
@@ -559,6 +575,19 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
           <span className="text-xs text-gray-600">{currentIndex + 1} / {total}</span>
           {result.source && (
             <span className="text-xs text-gray-500 truncate">{result.source} {result.length ? `(${result.length})` : ""}</span>
+          )}
+          {(result.page_url || result.url) && (
+            <a
+              href={result.page_url || result.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm transition flex items-center gap-1.5"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Visit Source
+            </a>
           )}
           {!isVideo && (
             <button

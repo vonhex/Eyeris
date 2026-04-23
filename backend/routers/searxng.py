@@ -8,8 +8,6 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from config import settings
-SEARXNG_PREFS = "eJx1WEuv47oN_jXNxmhwb6do0UVWBbptgXv3Bi3RNsey6KNHEp9fX8qPWIozi5MZf5QoiuLjkxQE7NgR-tvFgO0idHiDGPhiWIHBG9pL-lQ8TgYD3jrmzuClhTsptrVDz-aO7nahUabWk-PnfPvTRbyMGHrWt__9948_Lx5a9AhO9bffLqHHEW-eksaLKIgm-Fp0WXzUAZrbf8B4vGimQzuDfF7ZdZd1Wu3DbDZDFdqArgZDnR3l_9t80HewCnW9rbuiXxHdXJOtAwVRsILriGSCWt0xyySDKqwb6TkMOPubxhbE1kt0pm7ZjRAC2e42OQxhvmjy0BhZD21HVvz54x-_bYrrDi06MH_5279fYHUnjezrev1XRP_qoKtrz4rAVCNqAgFBtdFmg8QPDVZeDmSo68Xlb-iq9_OMCqImkY3Rk0oiM4mllSEbn9UEakjqRG1IMuuhTkey6JiGaiTn2NV1S2Zdc5JzqOQ36XaYCSxIZGjYFaXNrks8aKANtfRknwPgAql8S-5Jd3GHIpRTTIAfckc2YLWCcTp20wDpWA4RoFo1ZppXeABqdxOTGVNyeDGbDKW_zJWNHHc5xHYf9Cc0Oe7lvgU5nXdDQfUxYAk1UQ0YNsOaqSnWC5q67vA0T2glOzxmqy-Bc1VKXXWuWfXYDpxikSX9XEIce--wzX0s2EPfSfIwW3XG6e3zvOcEFltW0TlROuczNeK3JOrrwDT6AIH8YZPGO4ENEguZ7gRKQOXLad1Vko1kKdAiyRaROEdX9bHZfJisUIbPqYiyWdLH4ikKNIQiCLScRvrr-DN69kQmO514JiucleEPhGTOYdWaZiNMMlx-k90j_9zDdR8lhQhnLHYX5pGt5B0eo35_Zoa22nHa_h5M4k0degijFOd8mCE1uBxwKOWE2_AAh5UmJ3UyVczV260jOxDkmdzOc-blDum7l6qbI5aiP8JCvgPzpq-TMg3N8XGcq2KNDbrukKHEPY_7N7N2CDpfaGldpes37HRUG-5VzwZcniObZDIwp-rnDw_mkpEljXKF0i3Qpcr-Hss9NA7Sz2Z4DymAVyNXAJ_7lp0o8VfandMvC24fZKqJfXjtrI-d9KGuBbWPyJAqBbrH4D-IvHSCVxugUTeHB2nsYh4LZCHbogSlk4yc8wFfNOcV9Cf5ng99g8QW-MyFBsdxruQUx5hyO5nx1hDXEdFL2fuFLHnhV7KkWcLrg5jkFNxcpQTylFu0CbiVybYTRpIfnuRXdy8qhuHGB7y63YEmKtJFgQbpl5rtL_bwEvfg-wDdhxHabrqFYYGa4PVJqaZLZlZGit2BPqX8RX0k2MjfPeU2j4-xMTlgU5DKX3Zydtozy84Ah39GkHzHPXhZzx7zvsPGwLj32dSvQArGEXxHWu2yKTZScWCr629yk1KhxLbzya1PsLgGs0BLkA9SuYLU0L2QJlAW5Oy0VxJEfm_Ak24wX3ESLig0cVMg7EmSGn3erSZKSdrAnCmlJwhw7hW74FR9JhZu46Wo67ThfRNCNM9d7AV-UP8S7Qt8mlaUQ_G-8Ib7vvvlLCrNI5Bd9VdpDt3zgJZREpqFl-Zpp3VfEVzB2xbgbOvXQ_p-MS4BpXEr9Hnq2YcOhOtWjTR5n5MOiT5N4ZRUDoWJuWMtR10fpEoWfd9xCKk5SS1nzBrL6slx9hSKHiyXiLb34VTyPU4E-1G-DPbcccFfF-C83xU-7XeFH6ikh7-24TkKTS7TX0iXGlh4Y2v4sbNvP8Qm2hC3bx-llkf_ymu53Kjo_XWa5U63VxYFWs_XvVjvDGCiv0rPxBPuUUqFcPxPPdUnyjel-2O-_R0so-CAz54RCjBmpIiHWdJVOs6QauSejnKlJC2Uxa2NYIdDUiK2QXEGOboZEIqWGK2Xhu_7nAzDmrcZZ16QD7R5xZeTOQ5ohp65nC5A6YWZY4hNXmlfyIteAxnhgKmSZsPuNBbXwwc1RfFMLLhhHvw7WCyfgK_IZbgnUALOqTM6oVqa-S_gIxIETgYvFT0n5umas8RSqeHO81vUJDSFnmTc9eTvXHhKoFz4dlHORUu8HGHzYNM6aXFm6subA6nwzbawbZyFXAtXroKT67WRPqFz8e8_fvzzeWjWUaPNi8y3TdGdqeOfiMMZOcfZhhdHuDDUiQyHYw0L95TyGRFIwFnfChfqVuhchWMzdzjubGhCdG9xu1RgWX9I984HNnlIQ3mBTN9nY1wU9pJrfLDTloYsgPhJA1vpbJWfLdt5zC5F_t4lEpAplNtHSLeh5Iq3NhGfj-UN4DX2Lneo5XEje0oY5V5ahGQI7krZUQpjuReBsQDncF3h88PBAhfeFxZ0UM41B_v4ekUIf88eDaahu3acdXkv1Eg5YdtfMXOLbALlviFkcn2kWfCLcLDijavbbiDHVrZLULmX43FsMlFm-htDvT7wPWTllPhkl-s8_iEc1iyVl12telTDa9F9rgKjomQPr_VXurn0V4m-sBieePM2NGlxy3WqTm92TpLvvuWSaWtZkdMIKYh1ytSL9Atxxe3_r9Pwjw=="
-
 router = APIRouter(prefix="/api/searxng", tags=["searxng"])
 
 
@@ -35,7 +33,7 @@ async def search_web(
     }
     if not settings.SEARXNG_URL:
         raise HTTPException(status_code=503, detail="SearXNG URL not configured")
-    async with httpx.AsyncClient(timeout=20, cookies={"preferences": SEARXNG_PREFS}) as client:
+    async with httpx.AsyncClient(timeout=20) as client:
         try:
             resp = await client.get(f"{settings.SEARXNG_URL}/search", params=params)
             resp.raise_for_status()
@@ -54,6 +52,7 @@ async def search_web(
                 continue
             results.append({
                 "url": img_src,
+                "page_url": r.get("url"),
                 "thumbnail": thumb,
                 "title": r.get("title", ""),
                 "source": r.get("source", ""),
