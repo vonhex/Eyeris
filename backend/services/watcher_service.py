@@ -18,7 +18,7 @@ from pathlib import Path
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".heic",
                     ".cr2", ".nef", ".arw", ".orf", ".rw2", ".raf", ".dng"}
-SKIP_DIRS = {"@Recycle", "@Recently-Snapshot", ".@__thumb", "#recycle", ".Trash-1000", "__MACOSX", "_detected_nsfw"}
+SKIP_DIRS = {"@Recycle", "@Recently-Snapshot", ".@__thumb", "#recycle", ".Trash-1000", "__MACOSX"}
 MOUNT_BASE = "/mnt/nas"
 
 # Filled at startup from config; avoids circular import at module level

@@ -225,7 +225,6 @@ def list_image_ids(
     tag: str | None = None,
     category: str | None = None,
     search: str | None = None,
-    nsfw: bool | None = None,
     cluster_id: int | None = None,
     favorite: bool | None = None,
     date_from: datetime | None = None,
@@ -245,19 +244,6 @@ def list_image_ids(
         q = q.filter(Image.date_taken >= date_from)
     if date_to:
         q = q.filter(Image.date_taken <= date_to)
-    if nsfw is not None:
-        nsfw_ids = db.query(ImageTag.image_id).join(Tag).filter(Tag.name == "nsfw").subquery()
-        nsfw_folder_names = settings.NSFW_FOLDERS
-        if nsfw:
-            q = q.filter(
-                (Image.id.in_(db.query(nsfw_ids.c.image_id))) |
-                (Image.source_folder.in_(nsfw_folder_names))
-            )
-        else:
-            q = q.filter(
-                ~Image.id.in_(db.query(nsfw_ids.c.image_id)),
-                ~Image.source_folder.in_(nsfw_folder_names),
-            )
     if search:
         q = q.outerjoin(Image.tags).outerjoin(ImageTag.tag).filter(
             (Image.filename.ilike(f"%{search}%")) |

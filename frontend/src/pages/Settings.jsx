@@ -8,7 +8,6 @@ export default function Settings() {
   const [resetting, setResetting] = useState(false)
   const [message, setMessage] = useState(null)
   const [newShare, setNewShare] = useState("")
-  const [newNsfw, setNewNsfw] = useState("")
   const [smbPassword, setSmbPassword] = useState("")
 
   useEffect(() => {
