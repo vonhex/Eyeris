@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(tr *)",
+      "Bash(rm *)",
+      "Bash(id)",
+      "Bash(stat *)",
+      "Bash(true)",
+      "Bash(sudo *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(ssh-add *)",
+      "Bash(git config *)",
+      "Bash(find *)",
+      "Bash(ssh-keygen *)",
+      "Bash(ssh-agent *)",
+      "Bash(git fetch *)",
+      "Bash(git rebase *)",
+      "Bash(git stash)",
+      "Bash(git stash *)",
+      "Bash(git rm *)",
+      "Bash(git checkout *)",
+      "Bash(mv *)"
+    ]
+  },
+  "$version": 3
+}
