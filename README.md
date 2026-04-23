@@ -28,7 +28,7 @@ NAS share
 - **Semantic search** — Weighted keyword search across filenames, AI descriptions, and tags
 - **Real-time file watching** — Detects new images on the NAS immediately
 - **Hardware monitoring** — Live CPU, GPU (NVIDIA + AMD), and RAM stats
-- **Web image search** — SearXNG proxy with direct-to-NAS download
+- **Web search** — Search images and videos via SearXNG with direct-to-NAS download
 
 ---
 
@@ -149,7 +149,7 @@ React + Vite + Tailwind SPA. All API calls go through `src/api.js` (Axios, `base
 | `GET` | `/api/stats/locations` | Location names with counts |
 | `GET` | `/api/stats/cameras` | Camera models with counts |
 | `GET/PUT` | `/api/settings` | Read/update .env config |
-| `GET` | `/api/searxng/search` | Web image search proxy |
+| `GET` | `/api/searxng/search` | Web image/video search via SearXNG (`?category=images\|videos`) |
 | `POST` | `/api/searxng/download` | Download web image to NAS |
 
 Full interactive docs at `http://localhost:8000/docs` (Swagger UI).
@@ -204,7 +204,8 @@ Settings can also be updated at runtime via `PUT /api/settings` (persisted back 
 - Node.js 18+ and npm
 - MariaDB or MySQL
 - SMB/CIFS-accessible NAS storage
-- A-EYE (set up separately — see [A-EYE](https://github.com/vonhex/A-EYE))
+- **A-EYE** — set up separately by the user; provides AI tags/descriptions via XMP sidecars
+- **SearXNG** — set up separately; required for web image/video search (`GET /api/searxng/search`)
 
 ### 1. Clone & configure
 
