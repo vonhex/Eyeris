@@ -2,9 +2,36 @@
   <img src="eyeris-logo.png" alt="Eyeris" width="250" />
 </p>
 
-> Self-hosted photo manager with A-EYE integration — scans NAS shares, ingests AI-generated tags and descriptions, groups faces, and organizes your collection.
+> Self-hosted photo manager with AI tag ingestion. Your Pictures. Fast. Easy. Simple.
 
 Eyeris is a full-stack, self-hosted image management platform for large personal or home-lab photo libraries stored on NAS/SMB storage. It handles discovery, deduplication, metadata extraction, face grouping, and browsing. AI analysis (descriptions, tags, categories, sentiment) is provided by **A-EYE**, a separate tool you run yourself that writes XMP sidecar files back to the NAS. Eyeris picks those up automatically during each scan.
+
+---
+
+## Quick Deploy — Docker / Unraid
+
+```bash
+# Simplest option — runs on any Linux machine with Docker
+docker pull ghcr.io/vonhex/eyeris:latest
+
+docker run -d \
+  --name eyeris \
+  -p 8000:8000 \
+  -v /mnt/user/Pictures:/data/images \
+  -v /mnt/user/appdata/eyeris/thumbnails:/data/thumbnails \
+  -v /mnt/user/appdata/eyeris/db:/data/db \
+  -e SMB_HOST=192.168.1.x \
+  -e SMB_USERNAME=youruser \
+  -e SMB_PASSWORD=yourpass \
+  -e SMB_SHARES=photos,media \
+  ghcr.io/vonhex/eyeris:latest
+```
+
+Open `http://YOUR-IP:8000` — that's it. All settings (SMB creds, scan concurrency, SearXNG) are available in the Settings page at runtime.
+
+**Unraid Community App:** Import the template from this repo or search "eyeris" on Unraid. The container uses SQLite by default (no separate database needed). Add a MariaDB host for multi-container setups.
+
+See [unraid/template.xml](unraid/template.xml) for full configuration options.
 
 ---
 
@@ -58,7 +85,7 @@ Faces accumulate 512-d FaceNet embeddings stored in the database. `POST /api/fac
 ```
 backend/
 ├── main.py                  # App entry, startup migrations, SPA fallback
-├── config.py                # dotenv-backed Settings class
+├── config.py                # dotenv-backed Settings class (SQLite or MariaDB)
 ├── models.py                # SQLAlchemy ORM models
 ├── schemas.py               # Pydantic request/response schemas
 ├── database.py              # DB session factory
@@ -74,11 +101,11 @@ backend/
 │   └── searxng.py           # Web image search proxy + NAS download
 └── services/
     ├── scanner_service.py   # Scan pipeline and XMP ingestion
-    ├── gpu_models.py        # YOLOv8-face + FaceNet inference
+    ├── gpu_models.py        # YOLOv8-face + FaceNet inference (GPU/CPU)
     ├── image_service.py     # EXIF, orientation, thumbnails, hashing
     ├── smb_service.py       # SMB/CIFS file I/O
     ├── llm_search.py        # Weighted keyword search
-    ├── search_service.py    # Elasticsearch integration (optional)
+    ├── search_service.py    # Index helpers (no-op, search via SearXNG)
     └── watcher_service.py   # Real-time NAS file watcher
 ```
 
@@ -88,126 +115,17 @@ React + Vite + Tailwind SPA. All API calls go through `src/api.js` (Axios, `base
 
 **Pages:** Gallery, Image Detail, Albums, People, Tags, Folders, Duplicates, Image Search, Scan History, Dashboard, Settings
 
-**Key components:** `FilterSidebar`, `ImageGrid`, `ImageCard`, `TagEditor`, `ScanProgress`, `HardwareStats`
-
 ---
 
-## Database Models
-
-| Model | Key Fields |
-|---|---|
-| `Image` | `file_path`, `file_hash` (SHA-256), `perceptual_hash`, `width/height`, `thumbnail_path`, `analyzed`, `ai_description`, `album`, `face_count`, `favorite`, `date_taken`, `gps_lat/lon`, `camera_model`, `location_name`, `quality_flags` (JSON) |
-| `Tag` | `name` (unique); many-to-many with Image via `ImageTag` |
-| `Category` | `name`, `parent_id` (self-referential); many-to-many via `ImageCategory` |
-| `Face` | `image_id`, `person_name`, `cluster_id`, `face_bbox` (JSON), `embedding` (JSON 512-d), `crop_path`, `ignored` |
-| `ScanJob` | `status`, `source_folder`, `phase1_total/done`, `phase2_total/done`, `started_at`, `completed_at` |
-
----
-
-## API Reference
-
-### Images
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/images` | List images (pagination, filters, sort, search) |
-| `GET` | `/api/images/{id}` | Image detail with tags, faces, metadata |
-| `GET` | `/api/images/{id}/thumbnail` | Thumbnail JPEG |
-| `GET` | `/api/images/{id}/file` | Full-resolution image from NAS |
-| `GET` | `/api/images/duplicates` | Perceptual hash similarity groups |
-| `DELETE` | `/api/images/{id}` | Delete image and thumbnail |
-| `POST` | `/api/images/bulk-delete` | Delete multiple images |
-| `POST` | `/api/images/bulk-download` | ZIP download of selected images |
-| `POST` | `/api/images/bulk-tags` | Add/remove tags from multiple images |
-| `PUT` | `/api/images/{id}/tags` | Set exact tag list |
-| `PUT` | `/api/images/{id}/favorite` | Toggle favorite |
-
-### Faces & People
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/faces/people` | Person clusters with face counts |
-| `GET` | `/api/faces/{face_id}/crop` | Face crop thumbnail |
-| `POST` | `/api/faces/cluster` | Re-cluster all face embeddings |
-| `POST` | `/api/faces/cluster/merge` | Merge clusters into one |
-| `PUT` | `/api/faces/cluster/{cluster_id}/name` | Assign person name |
-
-### Scan Control
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/scan/status` | Current job + schedule state |
-| `POST` | `/api/scan/start` | Start/resume scan |
-| `POST` | `/api/scan/stop` | Request stop |
-| `POST` | `/api/scan/pause` | Pause scan |
-| `POST` | `/api/scan/resume` | Resume scan |
-| `POST` | `/api/scan/reset` | Truncate all data + delete thumbnails |
-| `POST` | `/api/scan/phash` | Compute perceptual hashes |
-
-### Other
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/tags` | All tags with image counts |
-| `GET` | `/api/albums` | All albums (metadata + virtual) |
-| `GET` | `/api/stats` | Dashboard stats |
-| `GET` | `/api/stats/hardware` | Live CPU/GPU/RAM metrics |
-| `GET` | `/api/stats/locations` | Location names with counts |
-| `GET` | `/api/stats/cameras` | Camera models with counts |
-| `GET/PUT` | `/api/settings` | Read/update .env config |
-| `GET` | `/api/searxng/search` | Web image/video search via SearXNG (`?category=images\|videos`) |
-| `POST` | `/api/searxng/download` | Download web image to NAS |
-
-Full interactive docs at `http://localhost:8000/docs` (Swagger UI).
-
----
-
-## Configuration
-
-Copy `.env.example` to `.env` and fill in your values:
-
-```env
-# NAS (SMB/CIFS)
-SMB_HOST=192.168.1.x
-SMB_USERNAME=your_nas_user
-SMB_PASSWORD=your_nas_password
-SMB_SHARES=photos,media         # comma-separated share names
-
-# MariaDB
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=eyeris
-DB_PASSWORD=your_db_password
-DB_NAME=eyeris
-
-# Scanner
-SCAN_CONCURRENCY=2              # parallel scan workers
-SCAN_INTERVAL_MINUTES=60        # auto-scan frequency
-
-# Scheduled scanning (optional)
-SCAN_SCHEDULE_ENABLED=false
-SCAN_SCHEDULE_START=22:00       # 24-hour format
-SCAN_SCHEDULE_END=06:00
-
-# Thumbnails
-THUMBNAIL_DIR=backend/thumbnails
-
-# Elasticsearch (optional, disabled by default)
-ES_ENABLED=false
-ES_HOST=http://localhost:9200
-ES_INDEX=eyeris
-```
-
-Settings can also be updated at runtime via `PUT /api/settings` (persisted back to `.env`).
-
----
-
-## Installation
+## Installation — Native (non-Docker)
 
 ### Prerequisites
 
 - Python 3.10+
 - Node.js 18+ and npm
-- **[MariaDB](https://github.com/mariadb)** (or MySQL)
 - SMB/CIFS-accessible NAS storage
-- **[A-EYE](https://github.com/SpaceinvaderOne/a-eye)** — set up separately by the user; provides AI tags/descriptions via XMP sidecars
-- **[SearXNG](https://github.com/searxng/searxng)** — set up separately; required for web image/video search (`GET /api/searxng/search`)
+- **[A-EYE](https://github.com/SpaceinvaderOne/a-eye)** — optional, provides AI tags/descriptions via XMP sidecars
+- **[SearXNG](https://github.com/searxng/searxng)** — optional, required for web image/video search
 
 ### 1. Clone & configure
 
@@ -215,7 +133,7 @@ Settings can also be updated at runtime via `PUT /api/settings` (persisted back 
 git clone https://github.com/vonhex/Eyeris.git
 cd Eyeris
 cp .env.example .env
-# Edit .env with your values
+# Edit .env with your values (see below)
 ```
 
 ### 2. Mount NAS shares
@@ -255,34 +173,85 @@ cd backend
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-| URL | Purpose |
-|---|---|
-| `http://localhost:5173` | Frontend dev server |
-| `http://localhost:8000` | Backend API (also serves built frontend in production) |
-| `http://localhost:8000/docs` | Swagger API docs |
+---
+
+## Configuration
+
+Copy `.env.example` to `.env` and fill in your values:
+
+```env
+# NAS (SMB/CIFS)
+SMB_HOST=192.168.1.x
+SMB_USERNAME=your_nas_user
+SMB_PASSWORD=your_nas_password
+SMB_SHARES=photos,media         # comma-separated share names
+
+# Database — SQLite by default (Docker/Unraid)
+# Leave DB_HOST empty for SQLite. Set to a MariaDB host for multi-container setups.
+DB_HOST=                        # e.g. 10.0.1.106 or leave empty
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_db_password
+DB_NAME=image_catalog
+
+# Scanner
+SCAN_CONCURRENCY=2              # parallel scan workers
+SCAN_INTERVAL_MINUTES=60        # auto-scan frequency
+
+# Scheduled scanning (optional)
+SCAN_SCHEDULE_ENABLED=false
+SCAN_SCHEDULE_START=22:00       # 24-hour format
+SCAN_SCHEDULE_END=06:00
+
+# SearXNG web search (optional)
+SEARXNG_URL=http://localhost:8887
+
+# Thumbnails (internal path)
+THUMBNAIL_DIR=backend/thumbnails
+```
+
+Settings can also be updated at runtime via `PUT /api/settings` (persisted back to `.env`).
 
 ---
 
-## Development
+## API Reference
 
-```bash
-# Backend
-source venv/bin/activate
-cd backend
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/images` | List images (pagination, filters, sort, search) |
+| `GET` | `/api/images/{id}` | Image detail with tags, faces, metadata |
+| `GET` | `/api/images/{id}/thumbnail` | Thumbnail JPEG |
+| `GET` | `/api/images/{id}/file` | Full-resolution image from NAS |
+| `GET` | `/api/images/duplicates` | Perceptual hash similarity groups |
+| `DELETE` | `/api/images/{id}` | Delete image and thumbnail |
+| `POST` | `/api/images/bulk-delete` | Delete multiple images |
+| `POST` | `/api/images/bulk-download` | ZIP download of selected images |
+| `POST` | `/api/images/bulk-tags` | Add/remove tags from multiple images |
+| `PUT` | `/api/images/{id}/tags` | Set exact tag list |
+| `PUT` | `/api/images/{id}/favorite` | Toggle favorite |
+| `GET` | `/api/faces/people` | Person clusters with face counts |
+| `GET` | `/api/faces/{face_id}/crop` | Face crop thumbnail |
+| `POST` | `/api/faces/cluster` | Re-cluster all face embeddings |
+| `POST` | `/api/faces/cluster/merge` | Merge clusters into one |
+| `PUT` | `/api/faces/cluster/{cluster_id}/name` | Assign person name |
+| `GET` | `/api/scan/status` | Current job + schedule state |
+| `POST` | `/api/scan/start` | Start/resume scan |
+| `POST` | `/api/scan/stop` | Request stop |
+| `POST` | `/api/scan/pause` | Pause scan |
+| `POST` | `/api/scan/resume` | Resume scan |
+| `POST` | `/api/scan/reset` | Truncate all data + delete thumbnails |
+| `POST` | `/api/scan/phash` | Compute perceptual hashes |
+| `GET` | `/api/tags` | All tags with image counts |
+| `GET` | `/api/albums` | All albums (metadata + virtual) |
+| `GET` | `/api/stats` | Dashboard stats |
+| `GET` | `/api/stats/hardware` | Live CPU/GPU/RAM metrics |
+| `GET` | `/api/stats/locations` | Location names with counts |
+| `GET` | `/api/stats/cameras` | Camera models with counts |
+| `GET/PUT` | `/api/settings` | Read/update .env config |
+| `GET` | `/api/searxng/search` | Web image/video search via SearXNG |
+| `POST` | `/api/searxng/download` | Download web image to NAS |
 
-# Frontend dev server (HMR)
-cd frontend
-npm run dev
-
-# Lint frontend
-cd frontend
-npm run lint
-```
-
-### Database Migrations
-
-No migration tool needed. `main.py` runs inline SQL `ALTER TABLE` statements on startup to add any missing columns to existing tables.
+Full interactive docs at `http://localhost:8000/docs` (Swagger UI).
 
 ---
 
@@ -291,12 +260,12 @@ No migration tool needed. `main.py` runs inline SQL `ALTER TABLE` statements on 
 | Layer | Technology |
 |---|---|
 | Backend | FastAPI, SQLAlchemy, Uvicorn |
-| Database | [MariaDB](https://github.com/mariadb) / MySQL |
+| Database | SQLite (default) or MariaDB/MySQL |
 | Frontend | React, Vite, Tailwind CSS, Axios |
 | Face detection | YOLOv8n-face + FaceNet (facenet-pytorch) |
 | AI tagging | [A-EYE](https://github.com/SpaceinvaderOne/a-eye) (external, via XMP sidecars) |
-| Storage | SMB/CIFS (QNAP NAS or compatible) |
-| Search | Weighted SQL keyword search; Elasticsearch optional |
+| Storage | SMB/CIFS |
+| Search | Weighted SQL keyword search; SearXNG for web image search |
 
 ---
 

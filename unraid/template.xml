@@ -1,0 +1,118 @@
+<?xml version="1.0"?>
+<!-- Eyeris — AI-Powered Photo Organizer (Unraid Community App Template) -->
+<!-- Your Pictures. Fast. Easy. Simple.                                   -->
+<Container name="eyeris" version="latest">
+  <Repository>ghcr.io/vonhex/eyeris:latest</Repository>
+  <Support>https://github.com/vonhex/Eyeris</Support>
+  <ProjectPage>https://github.com/vonhex/Eyeris</ProjectPage>
+  <Category>MediaApp:</Category>
+  <WebUI>http://[IP]:[PORT:8000]</WebUI>
+  <TemplateURL></TemplateURL>
+  <Icon>https://raw.githubusercontent.com/vonhex/Eyeris/main/frontend/public/eyeris-logo-icon.png</Icon>
+  <Description>AI-Powered Photo Organizer. Your Pictures. Fast. Easy. Simple.</Description>
+  
+  <!-- Network & Port -->
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  
+  <!-- Config Section -->
+  <Config>
+    <!-- Host Port (backend API) -->
+    <Variable>PUID</Variable>
+    <Value>1000</Value>
+    <Description>User ID for the container user</Description>
+    <Mode>host</Mode>
+    
+    <Variable>PGID</Variable>
+    <Value>100</Value>
+    <Description>Group ID for the container user</Description>
+    <Mode>host</Mode>
+    
+    <Variable>PORT</Variable>
+    <Value>8000</Value>
+    <Description>Port for the backend API and frontend</Description>
+    <Mode>host</Mode>
+    
+    <Variable>DB_HOST</Variable>
+    <Value></Value>
+    <Description>MariaDB/MySQL host (leave empty to use SQLite)</Description>
+    <Mode>default</Mode>
+    
+    <Variable>DB_PORT</Variable>
+    <Value>3306</Value>
+    <Description>MariaDB port</Description>
+    <Mode>default</Mode>
+    
+    <Variable>DB_USER</Variable>
+    <Value>root</Value>
+    <Description>MariaDB username</Description>
+    <Mode>default</Mode>
+    
+    <Variable>DB_PASSWORD</Variable>
+    <Value></Value>
+    <Description>MariaDB password</Description>
+    <Mode>default</Mode>
+    
+    <Variable>DB_NAME</Variable>
+    <Value>image_catalog</Value>
+    <Description>MariaDB database name (ignored if DB_HOST is empty)</Description>
+    <Mode>default</Mode>
+    
+    <Variable>SMB_HOST</Variable>
+    <Value></Value>
+    <Description>NAS SMB host IP or hostname</Description>
+    <Mode>default</Mode>
+    
+    <Variable>SMB_USERNAME</Variable>
+    <Value></Value>
+    <Description>SMB username</Description>
+    <Mode>default</Mode>
+    
+    <Variable>SMB_PASSWORD</Variable>
+    <Value></Value>
+    <Description>SMB password</Description>
+    <Mode>default</Mode>
+    
+    <Variable>SMB_SHARES</Variable>
+    <Value></Value>
+    <Description>Comma-separated list of SMB shares (e.g. photos,media)</Description>
+    <Mode>default</Mode>
+    
+    <Variable>SEARXNG_URL</Variable>
+    <Value></Value>
+    <Description>SearXNG URL for web image search (e.g. http://localhost:8887)</Description>
+    <Mode>default</Mode>
+    
+    <Variable>SCAN_CONCURRENCY</Variable>
+    <Value>2</Value>
+    <Description>Number of concurrent scan workers (1-10)</Description>
+    <Mode>default</Mode>
+  </Config>
+  
+  <!-- Mounts -->
+  <Data>
+    <Path>/data/images</Path>
+    <Host>/mnt/user/Pictures/</Host>
+    <Mode>rw</Mode>
+    <Description>Your photo directory to organize</Description>
+  </Data>
+  
+  <Data>
+    <Path>/data/thumbnails</Path>
+    <Host>/mnt/user/appdata/eyeris/thumbnails/</Host>
+    <Mode>rw</Mode>
+    <Description>Generated thumbnails storage</Description>
+  </Data>
+  
+  <Data>
+    <Path>/data/db</Path>
+    <Host>/mnt/user/appdata/eyeris/db/</Host>
+    <Mode>rw</Mode>
+    <Description>SQLite database (used when DB_HOST is empty)</Description>
+  </Data>
+  
+  <!-- GPU Passthrough (optional — enables CUDA face detection) -->
+  <GPU support="yes">
+    <NVIDIA>false</NVIDIA>
+  </GPU>
+</Container>

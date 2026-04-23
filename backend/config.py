@@ -12,8 +12,8 @@ class Settings:
     SMB_PASSWORD: str = os.getenv("SMB_PASSWORD", "")
     SMB_SHARES: list[str] = os.getenv("SMB_SHARES", "").split(",")
 
-    # MariaDB
-    DB_HOST: str = os.getenv("DB_HOST", "10.0.1.106")
+    # Database — SQLite by default (good for Docker/Unraid), MariaDB when DB_HOST is set
+    DB_HOST: str = os.getenv("DB_HOST", "")
     DB_PORT: int = int(os.getenv("DB_PORT", "3306"))
     DB_USER: str = os.getenv("DB_USER", "root")
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
@@ -21,10 +21,15 @@ class Settings:
 
     @property
     def DATABASE_URL(self) -> str:
-        return (
-            f"mysql+pymysql://{quote_plus(self.DB_USER)}:{quote_plus(self.DB_PASSWORD)}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-        )
+        if self.DB_HOST:
+            # MariaDB / MySQL
+            return (
+                f"mysql+pymysql://{quote_plus(self.DB_USER)}:{quote_plus(self.DB_PASSWORD)}"
+                f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+            )
+        # SQLite — default for Docker/Unraid deployments
+        db_path = os.path.join("/data/db", "images.db")
+        return f"sqlite:///{db_path}"
 
     # SearXNG integration
     SEARXNG_URL: str = os.getenv("SEARXNG_URL", "")

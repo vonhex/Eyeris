@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# AI Agent config
+.qwen/
+.claude/
+CLAUDE.md
+GEMINI.md
+QWEN.md
+AGENTS.md
+
+# Video demos
+*.mp4
+*.mov
+*.avi
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node
+node_modules/
+frontend/dist/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+backend/thumbnails/
+
+# Unraid template
+unraid/
+
+# Build artifacts
+*.egg-info/
+
+# OS files
+.DS_Store
+Thumbs.db
