@@ -24,10 +24,15 @@ async def search_web(
     category: str = Query("images", pattern="^(images|videos)$")
 ):
     """Search images or videos via SearXNG."""
+    if category == "images":
+        engines = "google images"
+    else:
+        engines = "google videos"
     params = {
         "q": q,
         "format": "json",
         "categories": category,
+        "engines": engines,
         "pageno": page,
         "safesearch": 0,
     }
