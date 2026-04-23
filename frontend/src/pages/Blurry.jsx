@@ -17,7 +17,7 @@ export default function Blurry() {
   const load = useCallback(async (tag, p = 1, replace = true) => {
     setLoading(true)
     try {
-      const data = await getImages({ tag, per_page: PAGE_SIZE, page: p, sort: "date_desc" })
+      const data = await getImages({ tag, page_size: PAGE_SIZE, page: p, sort: "date_added_desc" })
       const items = data.images ?? data
       if (replace) {
         setImages(items)
@@ -37,7 +37,7 @@ export default function Blurry() {
   useEffect(() => {
     Promise.all(
       BLUR_TAGS.map((tag) =>
-        getImages({ tag, per_page: 1, page: 1 })
+        getImages({ tag, page_size: 1, page: 1 })
           .then((d) => [tag, d.total ?? (d.images ?? d).length])
           .catch(() => [tag, 0])
       )
