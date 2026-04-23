@@ -26,6 +26,12 @@ function barColor(pct) {
   return "bg-green-500"
 }
 
+function vramColor(vendor) {
+  if (vendor === "nvidia") return "bg-green-500"
+  if (vendor === "intel")  return "bg-blue-500"
+  return "bg-purple-500" // amd
+}
+
 function StatRow({ label, value, pct, unit = "", barCol }) {
   return (
     <div className="space-y-0.5">
@@ -49,6 +55,43 @@ function Section({ title, children }) {
   )
 }
 
+function GpuSection({ gpu }) {
+  const vramPct = gpu.vram_total_mb
+    ? Math.round((gpu.vram_used_mb / gpu.vram_total_mb) * 100)
+    : null
+
+  return (
+    <Section title={gpu.name}>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 space-y-2">
+          <StatRow label="Usage" value={gpu.usage_pct} unit="%" pct={gpu.usage_pct} />
+          {gpu.vram_total_mb != null && (
+            <StatRow
+              label="VRAM"
+              value={`${gpu.vram_used_mb} / ${gpu.vram_total_mb}`}
+              unit=" MB"
+              pct={vramPct}
+              barCol={vramColor(gpu.vendor)}
+            />
+          )}
+        </div>
+        {gpu.temp_c != null && (
+          <div className="text-right shrink-0">
+            <p className={`text-lg font-bold tabular-nums ${tempColor(gpu.temp_c)}`}>{gpu.temp_c}°</p>
+            <p className="text-xs text-gray-600">GPU</p>
+          </div>
+        )}
+      </div>
+      {gpu.freq_mhz != null && (
+        <p className="text-xs text-gray-600">{gpu.freq_mhz} MHz</p>
+      )}
+      {gpu.mem_usage_pct != null && (
+        <p className="text-xs text-gray-600">Mem bandwidth: {gpu.mem_usage_pct}%</p>
+      )}
+    </Section>
+  )
+}
+
 export default function HardwareStats() {
   const [data, setData] = useState(null)
 
@@ -61,13 +104,12 @@ export default function HardwareStats() {
 
   if (!data) return null
 
-  const { cpu, igpu, gpu } = data
+  const { cpu, gpus = [] } = data
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-4">
       <h3 className="text-sm font-medium text-gray-300">Hardware</h3>
 
-      {/* CPU */}
       <Section title="CPU">
         <div className="flex items-center gap-3">
           <div className="flex-1 space-y-2">
@@ -86,59 +128,9 @@ export default function HardwareStats() {
         )}
       </Section>
 
-      {/* AMD iGPU */}
-      <Section title={igpu.name}>
-        <div className="flex items-center gap-3">
-          <div className="flex-1 space-y-2">
-            <StatRow label="Usage" value={igpu.usage_pct} unit="%" pct={igpu.usage_pct} />
-            {igpu.vram_total_mb != null && (
-              <StatRow
-                label="VRAM"
-                value={`${igpu.vram_used_mb} / ${igpu.vram_total_mb}`}
-                unit=" MB"
-                pct={igpu.vram_total_mb ? Math.round((igpu.vram_used_mb / igpu.vram_total_mb) * 100) : null}
-                barCol="bg-purple-500"
-              />
-            )}
-          </div>
-          {igpu.temp_c != null && (
-            <div className="text-right shrink-0">
-              <p className={`text-lg font-bold tabular-nums ${tempColor(igpu.temp_c)}`}>{igpu.temp_c}°</p>
-              <p className="text-xs text-gray-600">GPU</p>
-            </div>
-          )}
-        </div>
-        {igpu.freq_mhz != null && (
-          <p className="text-xs text-gray-600">{igpu.freq_mhz} MHz</p>
-        )}
-      </Section>
-
-      {/* NVIDIA RTX 5060 Ti */}
-      <Section title={gpu.name}>
-        <div className="flex items-center gap-3">
-          <div className="flex-1 space-y-2">
-            <StatRow label="Usage" value={gpu.usage_pct} unit="%" pct={gpu.usage_pct} />
-            {gpu.vram_total_mb != null && (
-              <StatRow
-                label="VRAM"
-                value={`${gpu.vram_used_mb} / ${gpu.vram_total_mb}`}
-                unit=" MB"
-                pct={gpu.vram_total_mb ? Math.round((gpu.vram_used_mb / gpu.vram_total_mb) * 100) : null}
-                barCol="bg-green-500"
-              />
-            )}
-          </div>
-          {gpu.temp_c != null && (
-            <div className="text-right shrink-0">
-              <p className={`text-lg font-bold tabular-nums ${tempColor(gpu.temp_c)}`}>{gpu.temp_c}°</p>
-              <p className="text-xs text-gray-600">GPU</p>
-            </div>
-          )}
-        </div>
-        {gpu.mem_usage_pct != null && (
-          <p className="text-xs text-gray-600">Mem bandwidth: {gpu.mem_usage_pct}%</p>
-        )}
-      </Section>
+      {gpus.map((gpu, i) => (
+        <GpuSection key={i} gpu={gpu} />
+      ))}
     </div>
   )
 }
