@@ -30,6 +30,7 @@ def _write_env(env: dict[str, str]):
         ("# Scheduled processing window", ["SCAN_SCHEDULE_ENABLED", "SCAN_SCHEDULE_START", "SCAN_SCHEDULE_END"]),
         ("# Elasticsearch", ["ES_HOST", "ES_INDEX"]),
         ("# A-EYE integration", ["AEYE_URL"]),
+        ("# SearXNG integration", ["SEARXNG_URL"]),
     ]
     written_keys = set()
     lines = []
@@ -60,6 +61,7 @@ class SettingsResponse(BaseModel):
     scan_schedule_start: str
     scan_schedule_end: str
     aeye_url: str
+    searxng_url: str
 
 
 class SettingsUpdate(BaseModel):
@@ -73,6 +75,7 @@ class SettingsUpdate(BaseModel):
     scan_schedule_start: str | None = None
     scan_schedule_end: str | None = None
     aeye_url: str | None = None
+    searxng_url: str | None = None
 
 
 @router.get("", response_model=SettingsResponse)
@@ -87,6 +90,7 @@ def get_settings():
         scan_schedule_start=settings.SCAN_SCHEDULE_START,
         scan_schedule_end=settings.SCAN_SCHEDULE_END,
         aeye_url=settings.AEYE_URL,
+        searxng_url=settings.SEARXNG_URL,
     )
 
 
@@ -145,6 +149,11 @@ def update_settings(body: SettingsUpdate):
         env["AEYE_URL"] = body.aeye_url
         settings.AEYE_URL = body.aeye_url
         changed.append("AEYE_URL")
+
+    if body.searxng_url is not None:
+        env["SEARXNG_URL"] = body.searxng_url
+        settings.SEARXNG_URL = body.searxng_url
+        changed.append("SEARXNG_URL")
 
     _write_env(env)
 

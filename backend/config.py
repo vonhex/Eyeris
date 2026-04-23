@@ -29,6 +29,9 @@ class Settings:
     # A-EYE integration
     AEYE_URL: str = os.getenv("AEYE_URL", "")
 
+    # SearXNG integration
+    SEARXNG_URL: str = os.getenv("SEARXNG_URL", "")
+
     # Scanner
     SCAN_CONCURRENCY: int = int(os.getenv("SCAN_CONCURRENCY", "2"))
     SCAN_INTERVAL_MINUTES: int = int(os.getenv("SCAN_INTERVAL_MINUTES", "60"))

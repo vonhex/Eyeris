@@ -34,6 +34,7 @@ export default function Settings() {
         scan_schedule_start: settings.scan_schedule_start || "22:00",
         scan_schedule_end: settings.scan_schedule_end || "06:00",
         aeye_url: settings.aeye_url || "",
+        searxng_url: settings.searxng_url || "",
       }
       if (smbPassword) payload.smb_password = smbPassword
       await updateSettings(payload)
@@ -203,6 +204,21 @@ export default function Settings() {
             Used to display A-EYE processing status on the dashboard.{" "}
             <a href="https://github.com/SpaceinvaderOne/a-eye" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
               What is A-EYE?
+            </a>
+          </p>
+        </Field>
+        <Field label="SearXNG URL">
+          <input
+            type="text"
+            value={settings.searxng_url || ""}
+            onChange={(e) => setSettings({ ...settings, searxng_url: e.target.value })}
+            placeholder="http://your-searxng-host:8080"
+            className="input-field"
+          />
+          <p className="text-xs text-gray-600 mt-1">
+            Self-hosted SearXNG instance for web image/video search.{" "}
+            <a href="https://github.com/searxng/searxng" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+              What is SearXNG?
             </a>
           </p>
         </Field>

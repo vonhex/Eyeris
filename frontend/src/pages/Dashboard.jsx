@@ -36,7 +36,6 @@ export default function Dashboard() {
           <StatCard label="Total Images" value={stats.total_images} />
           <StatCard label="Analyzed" value={stats.analyzed_images} />
           <StatCard label="Tags" value={stats.total_tags} />
-          <StatCard label="Categories" value={stats.total_categories} />
           {stats.duplicate_groups > 0 && (
             <StatCard label="Duplicate Groups" value={stats.duplicate_groups} accent="yellow" />
           )}

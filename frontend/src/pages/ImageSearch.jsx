@@ -292,7 +292,7 @@ function SearchResult({ result, selected, onToggle, onExpand }) {
             <img
               src={proxyThumb}
               alt={result.title || ""}
-              className={`w-full h-full object-cover transition-opacity ${loaded ? "opacity-100" : "opacity-0"}`}
+              className={`w-full h-full object-contain transition-opacity ${loaded ? "opacity-100" : "opacity-0"}`}
               onLoad={() => setLoaded(true)}
               onError={() => setImgError(true)}
             />
@@ -471,7 +471,7 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
         ref={imgContainerRef}
       >
         {/* Image/Video Container */}
-        <div className="relative flex items-center justify-center w-full max-h-[75vh] bg-gray-900 rounded-xl overflow-hidden min-h-[300px] aspect-video">
+        <div className="relative flex items-center justify-center w-full bg-gray-900 rounded-xl overflow-hidden">
           {isVideo ? (
             result.iframe_src ? (
               <iframe

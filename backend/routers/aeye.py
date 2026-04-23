@@ -36,11 +36,12 @@ async def get_aeye_status():
 
     if health:
         result["status"] = health.get("status")
-        result["ollama_connected"] = health.get("ollama_connected")
-        result["ollama_host"] = health.get("ollama_host")
-        result["vision_model"] = health.get("vision_model") or health.get("configured_vision_model")
-        result["llm_model"] = health.get("llm_model") or health.get("configured_llm_model")
-        models = health.get("available_models") or health.get("models") or []
+        ollama = health.get("ollama") or {}
+        result["ollama_connected"] = ollama.get("connected") if ollama else health.get("ollama_connected")
+        result["ollama_host"] = ollama.get("host") if ollama else health.get("ollama_host")
+        result["vision_model"] = (ollama.get("vision_model") if ollama else None) or health.get("vision_model") or health.get("configured_vision_model")
+        result["llm_model"] = (ollama.get("llm_model") if ollama else None) or health.get("llm_model") or health.get("configured_llm_model")
+        models = (ollama.get("models") if ollama else None) or health.get("available_models") or health.get("models") or []
         result["available_models"] = models if isinstance(models, list) else []
 
     if dashboard:

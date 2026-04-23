@@ -1,13 +1,18 @@
 {
-  "name": "Image Catalog",
-  "short_name": "Photos",
-  "description": "AI-powered photo gallery and organizer",
+  "name": "Eyeris",
+  "short_name": "Eyeris",
+  "description": "Self-hosted photo manager with A-EYE integration",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111827",
   "theme_color": "#111827",
   "orientation": "any",
   "icons": [
+    {
+      "src": "/eyeris-logo.png",
+      "sizes": "any",
+      "type": "image/png"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",

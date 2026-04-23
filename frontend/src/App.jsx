@@ -68,7 +68,10 @@ function App() {
     <BrowserRouter>
       <div className="min-h-screen flex flex-col">
         <nav className="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center gap-1 overflow-x-auto">
-          <h1 className="text-xl font-bold text-white mr-4 shrink-0">Image Catalog</h1>
+          <div className="flex items-center gap-2 mr-4 shrink-0">
+            <img src="/eyeris-logo.png" alt="Eyeris" className="h-7 w-7 rounded bg-white p-0.5 object-contain" />
+            <span className="text-xl font-bold text-white tracking-wide">eyeris</span>
+          </div>
           {navItems.map((item) => (
             <NavLink
               key={item.to}

@@ -1,4 +1,6 @@
-# Eyeris
+<p align="center">
+  <img src="eyeris-logo.png" alt="Eyeris" width="320" />
+</p>
 
 > Self-hosted photo manager with A-EYE integration — scans NAS shares, ingests AI-generated tags and descriptions, groups faces, and organizes your collection.
 
@@ -202,7 +204,7 @@ Settings can also be updated at runtime via `PUT /api/settings` (persisted back 
 
 - Python 3.10+
 - Node.js 18+ and npm
-- MariaDB or MySQL
+- **[MariaDB](https://github.com/mariadb)** (or MySQL)
 - SMB/CIFS-accessible NAS storage
 - **[A-EYE](https://github.com/SpaceinvaderOne/a-eye)** — set up separately by the user; provides AI tags/descriptions via XMP sidecars
 - **[SearXNG](https://github.com/searxng/searxng)** — set up separately; required for web image/video search (`GET /api/searxng/search`)
@@ -289,7 +291,7 @@ No migration tool needed. `main.py` runs inline SQL `ALTER TABLE` statements on 
 | Layer | Technology |
 |---|---|
 | Backend | FastAPI, SQLAlchemy, Uvicorn |
-| Database | MariaDB / MySQL |
+| Database | [MariaDB](https://github.com/mariadb) / MySQL |
 | Frontend | React, Vite, Tailwind CSS, Axios |
 | Face detection | YOLOv8n-face + FaceNet (facenet-pytorch) |
 | AI tagging | [A-EYE](https://github.com/SpaceinvaderOne/a-eye) (external, via XMP sidecars) |
