@@ -27,7 +27,7 @@ NAS share
 - **EXIF & GPS metadata** — Date taken, camera model, GPS coordinates with reverse geocoding
 - **Semantic search** — Weighted keyword search across filenames, AI descriptions, and tags
 - **Real-time file watching** — Detects new images on the NAS immediately
-- **Hardware monitoring** — Live CPU, GPU (NVIDIA + AMD), and RAM stats
+- **Hardware monitoring** — Live CPU, GPU (NVIDIA, AMD, Intel), and RAM stats — auto-detected, no hardcoded paths
 - **Web search** — Search images and videos via SearXNG with direct-to-NAS download
 
 ---
@@ -86,7 +86,7 @@ React + Vite + Tailwind SPA. All API calls go through `src/api.js` (Axios, `base
 
 **Pages:** Gallery, Image Detail, Albums, People, Tags, Folders, Duplicates, Image Search, Scan History, Dashboard, Settings
 
-**Key components:** `FilterSidebar`, `ImageGrid`, `ImageCard`, `TagEditor`, `ScanProgress`, `HardwareStats`, `NsfwSection`
+**Key components:** `FilterSidebar`, `ImageGrid`, `ImageCard`, `TagEditor`, `ScanProgress`, `HardwareStats`
 
 ---
 
