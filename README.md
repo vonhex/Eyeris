@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="eyeris-logo-ICON.png" alt="Eyeris" width="320" />
+  <img src="eyeris-logo-icon.png" alt="Eyeris" width="320" />
 </p>
 
 > Self-hosted photo manager with A-EYE integration — scans NAS shares, ingests AI-generated tags and descriptions, groups faces, and organizes your collection.
