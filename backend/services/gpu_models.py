@@ -5,7 +5,15 @@ import numpy as np
 from PIL import Image
 from io import BytesIO
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+def _get_device():
+    if torch.cuda.is_available():
+        return "cuda"
+    # Future-proofing: Check for ROCm (AMD) or other backends if torch is compiled for them
+    # ROCm usually presents as 'cuda' in torch if the environment is correct,
+    # but we can explicitly check for others here.
+    return "cpu"
+
+DEVICE = _get_device()
 
 _yolo_face_model = None
 _facenet_model = None
