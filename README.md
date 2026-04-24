@@ -119,7 +119,7 @@ backend/
 
 React + Vite + Tailwind SPA. All API calls go through `src/api.js` (Axios, `baseURL: "/api"`).
 
-**Pages:** Gallery, Image Detail, People, Tags, Folders, Duplicates, Image Search, Dashboard, Settings
+**Pages:** Gallery, Image Detail, People, Tags, Folders, Duplicates, Blurry, Image Search, Dashboard, Settings
 
 ---
 

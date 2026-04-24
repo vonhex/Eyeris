@@ -5,7 +5,7 @@
 #
 # Multi-stage build:
 #   Stage 1: frontend-build    — Node.js, builds the React SPA
-#   Stage 2: backend-runtime   — Python/CUDA, runs uvicorn + serves SPA
+#   Stage 2: backend-runtime   — Python (CPU PyTorch + minimal NVIDIA libs)
 # ============================================================
 
 # ── Stage 1: Frontend build ──────────────────────────────────────────
@@ -25,24 +25,38 @@ LABEL org.opencontainers.image.source="https://github.com/vonhex/Eyeris" \
       org.opencontainers.image.description="Eyeris — AI-Powered Photo Organizer" \
       maintainer="vonhex"
 
-# CUDA runtime (optional, for GPU face detection)
+# NVIDIA toolkit (for GPU access at runtime via nvidia-container-toolkit)
 ENV NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-# System deps: libmagic (file type), tesseract (text/OCR), net-tools, cmake/build tools
+# System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         file \
         cmake \
-        build-essential \
         libmagic1 \
         libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
+        libstdc++6 \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/*
 
-# Python deps — install first so Docker layer is cached when only code changes
+# Python deps — CPU PyTorch (auto-detects CUDA at runtime via nvidia-container-toolkit)
 WORKDIR /app/backend
 COPY backend/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir \
+        torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir \
+        fastapi uvicorn[standard] sqlalchemy pymysql cryptography smbprotocol Pillow \
+        httpx python-dotenv python-multipart ultralytics facenet-pytorch \
+        scipy reverse_geocode watchfiles imagehash numpy opencv-python-headless \
+        transformers onnxruntime nvidia-cublas-cu12 nvidia-cudnn-cu12 \
+        bcrypt PyJWT \
+    && rm -rf /usr/local/lib/python3.12/site-packages/nvidia/nccl \
+           /usr/local/lib/python3.12/site-packages/cusparselt \
+           /usr/local/lib/python3.12/site-packages/triton \
+           /usr/local/lib/python3.12/site-packages/_polars_runtime_32 \
+           /usr/local/lib/python3.12/site-packages/sympy \
+    && find /usr/local/lib/python3.12/site-packages/ -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
 # Backend source + pre-built frontend
 COPY backend/ ./

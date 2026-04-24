@@ -49,5 +49,8 @@ class Settings:
     THUMBNAIL_DIR: str = os.path.join(os.path.dirname(__file__), "thumbnails")
     THUMBNAIL_SIZE: tuple[int, int] = (300, 300)
 
+    # Authentication
+    SECRET_KEY: str = os.getenv("EYERIS_SECRET_KEY", "")
+
 
 settings = Settings()
