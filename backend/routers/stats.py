@@ -316,24 +316,29 @@ def get_quality_summary(db: Session = Depends(get_db)):
 
 @router.get("/folders")
 def get_folders(db: Session = Depends(get_db)):
-    from sqlalchemy import text
-    sql = text("""
-        SELECT
-            SUBSTRING(file_path, 1, LENGTH(file_path) - LOCATE('/', REVERSE(file_path))) as folder_path,
-            COUNT(*) as total,
-            SUM(CASE WHEN analyzed = 1 THEN 1 ELSE 0 END) as analyzed_count,
-            MIN(id) as sample_image_id
-        FROM images
-        GROUP BY folder_path
-        ORDER BY folder_path ASC
-    """)
-    results = db.execute(sql).fetchall()
-    return [
-        {
-            "folder": r.folder_path,
-            "total": r.total,
-            "analyzed": int(r.analyzed_count or 0),
-            "sample_image_id": r.sample_image_id,
-        }
-        for r in results if r.folder_path
-    ]
+    # Fetch all paths and analyzed status to group in Python
+    # (Cross-compatible way to find unique folders without complex dialect-specific SQL)
+    rows = db.query(Image.file_path, Image.analyzed, Image.id).all()
+    
+    folders_map = {}
+    for fp, analyzed, img_id in rows:
+        # Extract folder part (e.g., "photos/2023/vacation/img.jpg" -> "photos/2023/vacation")
+        folder_path = os.path.dirname(fp)
+        if not folder_path:
+            continue
+            
+        if folder_path not in folders_map:
+            folders_map[folder_path] = {
+                "folder": folder_path,
+                "total": 0,
+                "analyzed": 0,
+                "sample_image_id": img_id,
+            }
+        
+        folders_map[folder_path]["total"] += 1
+        if analyzed:
+            folders_map[folder_path]["analyzed"] += 1
+            
+    # Sort by folder path alphabetically
+    sorted_folders = sorted(folders_map.values(), key=lambda x: x["folder"])
+    return sorted_folders
