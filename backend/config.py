@@ -49,6 +49,9 @@ class Settings:
     THUMBNAIL_DIR: str = os.path.join(os.path.dirname(__file__), "thumbnails")
     THUMBNAIL_SIZE: tuple[int, int] = (300, 300)
 
+    # Media Storage
+    MOUNT_BASE: str = os.getenv("MOUNT_BASE", "/data/images")
+
     # Authentication
     @property
     def SECRET_KEY(self) -> str:

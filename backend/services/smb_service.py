@@ -9,14 +9,12 @@ SUPPORTED_EXTENSIONS = {
     ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".m4v"
 }
 
-MOUNT_BASE = "/mnt/nas"
-
-
 def _local_path(share: str, relative_path: str = "") -> str:
     """Build a local filesystem path from share + relative path."""
+    base = settings.MOUNT_BASE
     if relative_path:
-        return os.path.join(MOUNT_BASE, share, relative_path)
-    return os.path.join(MOUNT_BASE, share)
+        return os.path.join(base, share, relative_path)
+    return os.path.join(base, share)
 
 
 def list_images(share: str, subdir: str = "") -> list[dict]:

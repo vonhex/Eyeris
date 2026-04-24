@@ -15,10 +15,13 @@ import asyncio
 import os
 from pathlib import Path
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".heic",
-                    ".cr2", ".nef", ".arw", ".orf", ".rw2", ".raf", ".dng"}
+from config import settings
+
+SUPPORTED_EXTENSIONS = {
+    ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".heic",
+    ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".m4v"
+}
 SKIP_DIRS = {"@Recycle", "@Recently-Snapshot", ".@__thumb", "#recycle", ".Trash-1000", "__MACOSX"}
-MOUNT_BASE = "/mnt/nas"
 
 # Filled at startup from config; avoids circular import at module level
 _watch_paths: list[str] = []
@@ -28,15 +31,22 @@ _watcher_task: asyncio.Task | None = None
 def init_watch_paths(shares: list[str]) -> list[str]:
     """Build the list of local mount paths that exist and can be watched."""
     paths = []
-    for share in shares:
-        share = share.strip()
-        if not share:
-            continue
-        p = os.path.join(MOUNT_BASE, share)
-        if os.path.isdir(p):
-            paths.append(p)
-        else:
-            print(f"[Watcher] Share not mounted at {p} — skipping")
+    base = settings.MOUNT_BASE
+    
+    if not shares or (len(shares) == 1 and not shares[0].strip()):
+        # If no specific shares, watch the root mount point
+        if os.path.isdir(base):
+            paths.append(base)
+    else:
+        for share in shares:
+            share = share.strip()
+            if not share:
+                continue
+            p = os.path.join(base, share)
+            if os.path.isdir(p):
+                paths.append(p)
+            else:
+                print(f"[Watcher] Share not mounted at {p} — skipping")
     return paths
 
 
@@ -46,14 +56,13 @@ async def start_watcher():
     if _watcher_task and not _watcher_task.done():
         return  # already running
 
-    from config import settings
     paths = init_watch_paths(settings.SMB_SHARES)
     if not paths:
         print("[Watcher] No mounted NAS shares found — file watching disabled")
         return
 
     _watcher_task = asyncio.create_task(_watch_loop(paths))
-    print(f"[Watcher] Watching {len(paths)} share(s): {[os.path.basename(p) for p in paths]}")
+    print(f"[Watcher] Watching {len(paths)} path(s): {[os.path.basename(p) if os.path.basename(p) else p for p in paths]}")
 
 
 async def _watch_loop(watch_paths: list[str]):
@@ -85,7 +94,7 @@ async def _watch_loop(watch_paths: list[str]):
                 if change_type != watchfiles.Change.added:
                     continue
                 p = Path(path)
-                if p.suffix.lower() not in IMAGE_EXTENSIONS:
+                if p.suffix.lower() not in SUPPORTED_EXTENSIONS:
                     continue
                 if p.name.startswith(".") or p.name.startswith("._"):
                     continue
@@ -104,17 +113,25 @@ async def _handle_new_file(full_path: str):
         if not p.exists():
             return  # file already gone (temp file)
 
-        mount_base = Path(MOUNT_BASE)
+        mount_base = Path(settings.MOUNT_BASE)
         rel_to_mount = p.relative_to(mount_base)
         parts = rel_to_mount.parts
-        if len(parts) < 2:
-            return
+        
+        shares = [s.strip() for s in settings.SMB_SHARES if s.strip()]
+        
+        if not shares:
+            # Root mount point is being watched
+            share = ""
+            relative = str(rel_to_mount)
+        else:
+            if len(parts) < 2:
+                return
+            share = parts[0]
+            relative = str(Path(*parts[1:]))
 
-        share = parts[0]
-        relative = str(Path(*parts[1:]))
         file_size = p.stat().st_size
 
-        print(f"[Watcher] New image: {share}/{relative} ({file_size // 1024} KB)")
+        print(f"[Watcher] New file: {share}/{relative} ({file_size // 1024} KB)")
         from services.scanner_service import discover_new_file
         await discover_new_file(share, relative, file_size)
     except Exception as e:

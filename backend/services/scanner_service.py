@@ -227,6 +227,13 @@ async def _sync_task(db: Session, job: ScanJob):
             return []
 
     shares = [s.strip() for s in settings.SMB_SHARES if s.strip()]
+    if not shares:
+        # If no specific shares, try to scan the root mount point
+        if os.path.isdir(settings.MOUNT_BASE):
+            shares = [""] # Empty string will result in using MOUNT_BASE itself as the path
+        else:
+            print(f"[Scanner] No shares configured and {settings.MOUNT_BASE} not found. Skipping scan.")
+            return
 
     # Launch listing tasks but poll for stop every 0.5 s so we can bail out
     listing_tasks = [asyncio.create_task(_list_share(s)) for s in shares]
