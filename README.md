@@ -179,16 +179,16 @@ NAS share
 ## Application Screenshots
 
 ### Gallery & Search
-![Gallery & Search](Screenshot%202026-04-24%20104817.png)
+![Gallery & Search](docs/screenshots/gallery.png)
 
 ### AI Tag Cloud
-![AI Tag Cloud](Screenshot%202026-04-24%20104855.png)
+![AI Tag Cloud](docs/screenshots/tags.png)
 
 ### System Dashboard & Hardware Stats
-![System Dashboard](Screenshot%202026-04-24%20104842.png)
+![System Dashboard](docs/screenshots/dashboard.png)
 
 ### Blurry Photo Detection
-![Blurry Photo Detection](Screenshot%202026-04-24%20104832.png)
+![Blurry Photo Detection](docs/screenshots/blurry.png)
 
 ---
 
