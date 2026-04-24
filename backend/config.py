@@ -50,7 +50,9 @@ class Settings:
     THUMBNAIL_SIZE: tuple[int, int] = (300, 300)
 
     # Authentication
-    SECRET_KEY: str = os.getenv("EYERIS_SECRET_KEY", "")
+    @property
+    def SECRET_KEY(self) -> str:
+        return os.getenv("EYERIS_SECRET_KEY", "")
 
 
 settings = Settings()

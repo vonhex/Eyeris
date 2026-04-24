@@ -31,7 +31,12 @@ def _verify_token(
     if not raw:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    secret_key = settings.SECRET_KEY or ""
+    secret_key = settings.SECRET_KEY
+    if not secret_key:
+        # Fallback for the very first request if auto_setup happened in background
+        from routers.auth import _read_env
+        secret_key = _read_env().get("EYERIS_SECRET_KEY", "")
+
     try:
         payload = pyjwt.decode(raw, secret_key, algorithms=["HS256"])
         return payload
@@ -79,11 +84,19 @@ async def lifespan(app_instance: FastAPI):
             if "ignored" not in face_cols:
                 conn.execute(text("ALTER TABLE faces ADD COLUMN ignored TINYINT(1) NOT NULL DEFAULT 0"))
                 print("[Startup] Added faces.ignored")
+            
+            is_sqlite = "sqlite" in str(engine.url)
             if "ix_faces_cluster_id" not in face_indexes:
-                conn.execute(text("ALTER TABLE faces ADD INDEX ix_faces_cluster_id (cluster_id)"))
+                if is_sqlite:
+                    conn.execute(text("CREATE INDEX ix_faces_cluster_id ON faces (cluster_id)"))
+                else:
+                    conn.execute(text("ALTER TABLE faces ADD INDEX ix_faces_cluster_id (cluster_id)"))
                 print("[Startup] Added index ix_faces_cluster_id")
             if "ix_faces_crop_path" not in face_indexes:
-                conn.execute(text("ALTER TABLE faces ADD INDEX ix_faces_crop_path (crop_path(255))"))
+                if is_sqlite:
+                    conn.execute(text("CREATE INDEX ix_faces_crop_path ON faces (crop_path)"))
+                else:
+                    conn.execute(text("ALTER TABLE faces ADD INDEX ix_faces_crop_path (crop_path(255))"))
                 print("[Startup] Added index ix_faces_crop_path")
     except Exception as e:
         print(f"[Startup] Face migration: {e}")
@@ -92,6 +105,7 @@ async def lifespan(app_instance: FastAPI):
         inspector = sa_inspect(engine)
         img_cols = {c["name"] for c in inspector.get_columns("images")}
         with engine.begin() as conn:
+            is_sqlite = "sqlite" in str(engine.url)
             if "favorite" not in img_cols:
                 conn.execute(text("ALTER TABLE images ADD COLUMN favorite TINYINT(1) NOT NULL DEFAULT 0"))
                 print("[Startup] Added images.favorite")
@@ -109,14 +123,20 @@ async def lifespan(app_instance: FastAPI):
                 print("[Startup] Added images.camera_model")
             if "location_name" not in img_cols:
                 conn.execute(text("ALTER TABLE images ADD COLUMN location_name VARCHAR(255) NULL"))
-                conn.execute(text("ALTER TABLE images ADD INDEX ix_images_location_name (location_name)"))
+                if is_sqlite:
+                    conn.execute(text("CREATE INDEX ix_images_location_name ON images (location_name)"))
+                else:
+                    conn.execute(text("ALTER TABLE images ADD INDEX ix_images_location_name (location_name)"))
                 print("[Startup] Added images.location_name")
             if "quality_flags" not in img_cols:
                 conn.execute(text("ALTER TABLE images ADD COLUMN quality_flags TEXT NULL"))
                 print("[Startup] Added images.quality_flags")
             if "is_video" not in img_cols:
                 conn.execute(text("ALTER TABLE images ADD COLUMN is_video TINYINT(1) NOT NULL DEFAULT 0"))
-                conn.execute(text("ALTER TABLE images ADD INDEX ix_images_is_video (is_video)"))
+                if is_sqlite:
+                    conn.execute(text("CREATE INDEX ix_images_is_video ON images (is_video)"))
+                else:
+                    conn.execute(text("ALTER TABLE images ADD INDEX ix_images_is_video (is_video)"))
                 print("[Startup] Added images.is_video")
             
             # Backfill is_video based on filename extensions

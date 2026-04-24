@@ -51,6 +51,10 @@ def _write_env(env: dict[str, str]):
 
     with open(ENV_PATH, "w") as f:
         f.write("\n".join(lines) + "\n")
+    
+    # Update current process environment
+    for key, value in env.items():
+        os.environ[key] = str(value)
 
 
 def _get_password_hash() -> str | None:
