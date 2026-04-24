@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom"
-import { useEffect, useState, Suspense, ErrorBoundary } from "react"
+import { Component, useEffect, useState, Suspense } from "react"
 import Gallery from "./pages/Gallery"
 import ImageDetail from "./pages/ImageDetail"
 import Dashboard from "./pages/Dashboard"
@@ -63,6 +63,23 @@ function ErrorFallback({ error, reset }) {
       </div>
     </div>
   )
+}
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+  render() {
+    if (this.state.error) {
+      const Fallback = this.props.fallback
+      return <Fallback error={this.state.error} reset={() => this.setState({ error: null })} />
+    }
+    return this.props.children
+  }
 }
 
 function PhashStatusBar() {
