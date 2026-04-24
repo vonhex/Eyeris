@@ -2,8 +2,12 @@ import glob
 import os
 import re
 import subprocess
+import time
 
 import psutil
+
+# Cache previous xe engine busyness readings for delta-based utilisation
+_xe_prev: dict = {}   # card_name -> {"time": float, "vals": list[float]}
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -148,15 +152,30 @@ def _intel_gpu_stats(card: dict) -> dict:
                 _read_sysfs(f"{cp}/device/gt_cur_freq_mhz"))
 
     # --- Utilisation ---
-    # xe: per-engine busyness files — average render+compute engines
+    # xe: busyness files hold cumulative nanoseconds of engine active time —
+    # must diff two readings to get a percentage.
     util = None
     if driver == "xe":
-        busyness_paths = glob.glob(f"{cp}/device/tile0/gt0/engines/*/busyness")
-        if not busyness_paths:
-            busyness_paths = glob.glob(f"{cp}/device/tile*/gt*/engines/*/busyness")
-        vals = [_read_sysfs(p) for p in busyness_paths if _read_sysfs(p) is not None]
-        if vals:
-            util = round(sum(vals) / len(vals), 1)
+        busyness_paths = sorted(
+            glob.glob(f"{cp}/device/tile0/gt0/engines/*/busyness") or
+            glob.glob(f"{cp}/device/tile*/gt*/engines/*/busyness")
+        )
+        now = time.monotonic()
+        cur_vals = [_read_sysfs(p) for p in busyness_paths]
+        cur_vals = [v for v in cur_vals if v is not None]
+        prev = _xe_prev.get(card_name)
+        if prev and cur_vals and len(cur_vals) == len(prev["vals"]):
+            dt_ns = (now - prev["time"]) * 1e9
+            if dt_ns > 0:
+                pcts = [
+                    min(100.0, (c - p) / dt_ns * 100)
+                    for c, p in zip(cur_vals, prev["vals"])
+                    if c >= p
+                ]
+                if pcts:
+                    util = round(sum(pcts) / len(pcts), 1)
+        if cur_vals:
+            _xe_prev[card_name] = {"time": now, "vals": cur_vals}
     # i915 / fallback: no reliable sysfs util on iGPU — leave as None
 
     # --- VRAM (Arc discrete has lmem, iGPU shares system RAM) ---
