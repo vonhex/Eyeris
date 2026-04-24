@@ -346,4 +346,4 @@ Full interactive docs: `http://localhost:8000/docs`
 
 ## License
 
-[PolyForm Noncommercial License 1.0.0](LICENSE) — free to use and modify, not for commercial use or resale. For commercial licensing contact necropsyk@gmail.com.
+[PolyForm Noncommercial License 1.0.0](LICENSE) — free to use and modify, not for commercial use or resale. For commercial licensing contact lucashjantzen@gmail.com.
