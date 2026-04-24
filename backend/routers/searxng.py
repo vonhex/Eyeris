@@ -82,9 +82,16 @@ async def search_web(
 async def proxy_image(url: str = Query(...)):
     """Proxy an external image URL through the backend to avoid CORS issues."""
     _validate_url(url)
+    parsed = urlparse(url)
+    headers = {"User-Agent": "Mozilla/5.0 (compatible)"}
+    # Many image hosts check Referer; set it to the parent page URL for sites that require it
+    referer = f"{parsed.scheme}://{parsed.netloc}/" if parsed.scheme in ("http", "https") else None
+    if referer:
+        headers["Referer"] = referer
+
     async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
         try:
-            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible)"})
+            resp = await client.get(url, headers=headers)
         except Exception as e:
             raise HTTPException(status_code=502, detail=f"Failed to fetch image: {e}")
     if resp.status_code >= 400:

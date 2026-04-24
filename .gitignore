@@ -21,3 +21,11 @@ CLAUDE.md
 QWEN.md
 .claude/
 .qwen/
+
+# User requested ignores
+.github/workflows/
+.gitignore
+.dockerignore
+
+# Screenshots
+Screenshot*.png

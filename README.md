@@ -175,6 +175,22 @@ NAS share
 
 ---
 
+## Application Screenshots
+
+### Gallery & Search
+![Gallery & Search](Screenshot%202026-04-24%20104817.png)
+
+### AI Tag Cloud
+![AI Tag Cloud](Screenshot%202026-04-24%20104855.png)
+
+### System Dashboard & Hardware Stats
+![System Dashboard](Screenshot%202026-04-24%20104842.png)
+
+### Blurry Photo Detection
+![Blurry Photo Detection](Screenshot%202026-04-24%20104832.png)
+
+---
+
 ## Configuration
 
 Copy `.env.example` to `.env` and fill in your values:

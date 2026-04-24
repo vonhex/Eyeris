@@ -81,7 +81,10 @@ export const updateSmartAlbum = (id, name, filters) => api.put(`/smart-albums/${
 export const deleteSmartAlbum = (id) => api.delete(`/smart-albums/${id}`).then((r) => r.data)
 export const searxngSearch = (q, page = 1, category = "images") => api.get("/searxng/search", { params: { q, page, category } }).then((r) => r.data)
 export const searxngDownload = (urls, share, subfolder) => api.post("/searxng/download", { urls, share, subfolder }).then((r) => r.data)
-export const searxngProxyUrl = (url) => `/api/searxng/proxy?url=${encodeURIComponent(url)}`
+export const searxngProxyUrl = (url) => {
+  const t = getToken()
+  return `/api/searxng/proxy?url=${encodeURIComponent(url)}${t ? `&token=${t}` : ""}`
+}
 
 // Auth endpoints — use direct fetch to avoid /api prefix conflicts
 const authFetch = (path, options) => fetch(`/api${path}`, options).then((r) => r.json())
