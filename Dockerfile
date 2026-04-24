@@ -50,7 +50,6 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && rm -rf /usr/local/lib/python3.12/site-packages/cusparselt \
            /usr/local/lib/python3.12/site-packages/triton \
            /usr/local/lib/python3.12/site-packages/_polars_runtime_32 \
-           /usr/local/lib/python3.12/site-packages/sympy \
     && find /usr/local/lib/python3.12/site-packages/ -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
 # Backend source + pre-built frontend
