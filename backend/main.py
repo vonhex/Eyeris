@@ -1,7 +1,16 @@
+import logging
 import os
 from contextlib import asynccontextmanager
-
 from typing import Optional
+
+# Suppress access log noise for high-frequency polling endpoints
+class _SuppressPollingEndpoints(logging.Filter):
+    _MUTED = {"/api/scan/status", "/api/stats/hardware", "/api/health"}
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return not any(ep in msg for ep in self._MUTED)
+
+logging.getLogger("uvicorn.access").addFilter(_SuppressPollingEndpoints())
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
