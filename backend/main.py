@@ -1,24 +1,60 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from typing import Optional
+
+from fastapi import FastAPI, Request, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from database import engine, Base
-from routers import images, tags, categories, scan, stats, albums, faces, settings as settings_router, searxng
+from routers import images, tags, categories, scan, stats, albums, faces, settings as settings_router, searxng, auth
 from services.scanner_service import start_background_scanner
 from services.watcher_service import start_watcher
+from config import settings
 
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+# auto_error=False so requests without Authorization header don't immediately 401
+# (allows falling back to ?token= query param for <img src> requests)
+security = HTTPBearer(auto_error=False)
+
+
+def _verify_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    token: Optional[str] = Query(default=None),
+):
+    """Verify JWT from Authorization header or ?token= query param."""
+    import jwt as pyjwt
+
+    raw = credentials.credentials if credentials else token
+    if not raw:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    secret_key = settings.SECRET_KEY or ""
+    try:
+        payload = pyjwt.decode(raw, secret_key, algorithms=["HS256"])
+        return payload
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app_instance: FastAPI):
     # Startup: create tables and start scanner
     Base.metadata.create_all(bind=engine)
     print("[Startup] Database tables created/verified")
+
+    # Auto-setup: if no password hash yet, generate one with default password
+    from routers.auth import _is_setup_complete, auto_setup as _auto_setup
+    if not _is_setup_complete():
+        try:
+            result = _auto_setup()  # sync I/O, FastAPI handles it in thread pool
+            print(f"[Startup] Auto-created account (password: {result.get('password')})")
+        except HTTPException:
+            pass  # already set up by another process/thread
+        except Exception as e:
+            print(f"[Startup] Auto-setup: {e}")
 
     # Migrate faces table — add new columns if missing
     try:
@@ -104,15 +140,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(images.router)
-app.include_router(tags.router)
-app.include_router(categories.router)
-app.include_router(scan.router)
-app.include_router(stats.router)
-app.include_router(albums.router)
-app.include_router(faces.router)
-app.include_router(settings_router.router)
-app.include_router(searxng.router)
+
+# Route registration — auth routes are public, all others require JWT token
+app.include_router(auth.router)
+
+for _router in [images.router, tags.router, categories.router, scan.router,
+                stats.router, albums.router, faces.router, settings_router.router, searxng.router]:
+    app.include_router(_router, dependencies=[Depends(_verify_token)])
 
 
 @app.get("/api/health")
@@ -120,17 +154,7 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/api/reindex")
-def reindex():
-    """Reindex all images (no-op — ES removed)."""
-    from database import SessionLocal
-    db = SessionLocal()
-    try:
-        count = es_reindex_all(db)
-        return {"status": "ok", "indexed": count}
-    finally:
-        db.close()
-
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 # Serve React frontend in production
 if os.path.isdir(FRONTEND_DIR):

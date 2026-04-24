@@ -63,12 +63,18 @@ export const nameCluster = (clusterId, name) => api.put(`/faces/cluster/${cluste
 export const mergeClusters = (sourceIds, targetId) => api.post("/faces/cluster/merge", { source_cluster_ids: sourceIds, target_cluster_id: targetId }).then((r) => r.data)
 export const deleteCluster = (clusterId) => api.delete(`/faces/cluster/${clusterId}`).then((r) => r.data)
 export const deleteClusters = (clusterIds) => api.post("/faces/clusters/delete", { cluster_ids: clusterIds }).then((r) => r.data)
-export const faceCropUrl = (faceId) => `/api/faces/${faceId}/crop`
+const getToken = () => localStorage.getItem("eyeris_auth_token") || ""
+export const faceCropUrl = (faceId) => `/api/faces/${faceId}/crop?token=${getToken()}`
 export const resetDatabase = () => api.post("/scan/reset").then((r) => r.data)
 export const getSettings = () => api.get("/settings").then((r) => r.data)
 export const updateSettings = (data) => api.put("/settings", data).then((r) => r.data)
-export const thumbnailUrl = (id, path = "") => `/api/images/${id}/thumbnail${path ? `?v=${path.split('.')[0]}` : ""}`
-export const fullImageUrl = (id) => `/api/images/${id}/file`
+export const thumbnailUrl = (id, path = "") => {
+  const t = getToken()
+  const v = path ? path.split('.')[0] : ""
+  const params = [t && `token=${t}`, v && `v=${v}`].filter(Boolean).join("&")
+  return `/api/images/${id}/thumbnail${params ? `?${params}` : ""}`
+}
+export const fullImageUrl = (id) => `/api/images/${id}/file?token=${getToken()}`
 export const getSmartAlbums = () => api.get("/smart-albums").then((r) => r.data)
 export const createSmartAlbum = (name, filters) => api.post("/smart-albums", { name, filters }).then((r) => r.data)
 export const updateSmartAlbum = (id, name, filters) => api.put(`/smart-albums/${id}`, { name, filters }).then((r) => r.data)
