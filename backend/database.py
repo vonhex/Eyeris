@@ -11,7 +11,7 @@ engine = create_engine(
     settings.DATABASE_URL,
     connect_args=connect_args,
     pool_pre_ping=True if not "sqlite" in settings.DATABASE_URL else False,
-    pool_recycle=3600 if not "sqlite" in settings.DATABASE_URL else None,
+    pool_recycle=3600 if not "sqlite" in settings.DATABASE_URL else -1,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
