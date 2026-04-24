@@ -8,6 +8,8 @@ from datetime import datetime
 
 from PIL import Image, ExifTags
 
+Image.MAX_IMAGE_PIXELS = None  # allow large images (e.g. 108MP panoramas/scans)
+
 from config import settings
 
 # EXIF orientation tag ID
