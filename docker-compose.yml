@@ -8,6 +8,7 @@ services:
     env_file:
       - .env
     volumes:
+      - ./.env:/app/.env:rw
       - ./data/thumbnails:/data/thumbnails
       - ./data/db:/data/db
       - ./data/images:/data/images

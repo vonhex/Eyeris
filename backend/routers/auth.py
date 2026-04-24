@@ -14,7 +14,9 @@ JWT_EXPIRE_DAYS = 30
 
 
 def _read_env() -> dict[str, str]:
-    env = {}
+    # Seed from process environment (works in Docker where .env is passed as env vars)
+    env = {k: v for k, v in os.environ.items()}
+    # File values override, and become the source of truth for writes
     if os.path.exists(ENV_PATH):
         with open(ENV_PATH, "r") as f:
             for line in f:

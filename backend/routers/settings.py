@@ -9,8 +9,8 @@ ENV_PATH = os.path.join(os.path.dirname(__file__), '..', '..', '.env')
 
 
 def _read_env() -> dict[str, str]:
-    """Read .env file into a dict, preserving comments."""
-    env = {}
+    """Read env vars from process environment first, then overlay with .env file values."""
+    env = {k: v for k, v in os.environ.items()}
     if os.path.exists(ENV_PATH):
         with open(ENV_PATH, "r") as f:
             for line in f:

@@ -487,33 +487,28 @@ async def _load_xmp_for_image(db: Session, img_record: Image):
 
         # Load tags
         if xmp_meta["tags"]:
-            # Normalise to lowercase
             tag_names = [t.strip().lower() for t in xmp_meta["tags"] if t.strip()]
+            staged_tags: set[str] = set()  # prevent duplicates within this XMP file
             for tag_name in tag_names:
-                # 1. Get or create tag
+                if tag_name in staged_tags:
+                    continue
+                staged_tags.add(tag_name)
+
+                # Get or create tag
                 tag = db.query(Tag).filter(Tag.name == tag_name).first()
                 if not tag:
-                    try:
-                        tag = Tag(name=tag_name)
-                        db.add(tag)
-                    except Exception:
-                        tag = db.query(Tag).filter(Tag.name == tag_name).first()
+                    tag = Tag(name=tag_name)
+                    db.add(tag)
+                    db.flush()  # get tag.id before checking link
 
-                if tag:
-                    # 2. Check if link already exists in current session/DB
-                    link_exists = False
-                    if tag.id:
-                        link_exists = db.query(ImageTag).filter(
-                            ImageTag.image_id == img_record.id,
-                            ImageTag.tag_id == tag.id
-                        ).first()
-                    
-                    if not link_exists:
-                        try:
-                            # Use object relationship to avoid needing tag.id immediately
-                            db.add(ImageTag(image=img_record, tag=tag))
-                        except Exception:
-                            pass # Skip if it still fails
+                # Check if link already exists in DB
+                if tag.id:
+                    exists = db.query(ImageTag).filter(
+                        ImageTag.image_id == img_record.id,
+                        ImageTag.tag_id == tag.id
+                    ).first()
+                    if not exists:
+                        db.add(ImageTag(image_id=img_record.id, tag_id=tag.id))
 
         print(f"[XMP] Loaded {len(xmp_meta['tags'])} tags for {img_record.filename}")
 

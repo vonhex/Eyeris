@@ -12,6 +12,7 @@ torch
 torchvision
 ultralytics
 facenet-pytorch
+huggingface_hub
 scipy
 reverse_geocode
 watchfiles
