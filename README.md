@@ -8,56 +8,62 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Noncommercial-orange?style=flat-square" alt="License"></a>
 </p>
 
-> Self-hosted photo manager with AI tag ingestion. Your Pictures. Fast. Easy. Simple.
+<p align="center">Self-hosted AI photo manager. Your Pictures. Fast. Easy. Simple.</p>
 
 > [!WARNING]
 > **Eyeris is designed for use on a trusted local network only.** It has no brute-force protection on the login endpoint, no multi-user access control, and image URLs embed session tokens that appear in server logs. Do not expose it directly to the internet. If you need remote access, use a VPN or put it behind Cloudflare Access — not a plain public tunnel.
 
 ---
 
-## 📖 Documentation
-Detailed guides, technical architecture, and API specs are available in the **[Project Wiki](https://github.com/vonhex/Eyeris/wiki)**:
+## How do I install it?
 
-- **[Installation Guide](https://github.com/vonhex/Eyeris/wiki/Installation)** (Docker, Linux Script, Manual Source)
-- **[Video Support](https://github.com/vonhex/Eyeris/wiki/Video-Support)** (Metadata, playback, and limitations)
-- **[AI Integration (A-EYE)](https://github.com/vonhex/Eyeris/wiki/AI-Integration-(A-EYE))** (How semantic search works)
-- **[API Reference](https://github.com/vonhex/Eyeris/wiki/API-Reference)** (Endpoints and Authentication)
+| Who it's for | Method | Guide |
+|---|---|---|
+| **Unraid users** | Community Apps — one-click install, no files needed | [Unraid →](https://github.com/vonhex/Eyeris/wiki/Installation#path-1-unraid) |
+| **Everyone else** (Linux / Windows / macOS with Docker) | Run `./docker-start.sh` — auto-detects your GPU | [Docker →](https://github.com/vonhex/Eyeris/wiki/Installation#path-2-docker) |
+| **Developers** | Run `./start.sh` — Python + Node directly, no Docker | [Dev →](https://github.com/vonhex/Eyeris/wiki/Installation#path-3-developer--manual) |
+
+> Not sure? **Use the Docker path.** It works on any OS and handles everything automatically.
 
 ---
 
-## 🚀 Quick Start (Docker)
-The fastest way to get Eyeris up and running:
+## Quick Start (Docker)
 
 ```bash
-docker run -d \
-  --name eyeris \
-  -p 8000:8000 \
-  -v ./thumbnails:/data/thumbnails \
-  -v ./db:/data/db \
-  -e SMB_HOST=192.168.1.x \
-  -e SMB_USERNAME=youruser \
-  -e SMB_PASSWORD=yourpass \
-  -e SMB_SHARES=photos,media \
-  ghcr.io/vonhex/eyeris:latest
+# 1. Clone the repo
+git clone https://github.com/vonhex/Eyeris.git
+cd Eyeris
+
+# 2. Run the start script — it will create .env and tell you what to fill in
+chmod +x docker-start.sh
+./docker-start.sh
+
+# 3. Edit .env with your NAS credentials (SMB_HOST, SMB_USERNAME, etc.)
+nano .env
+
+# 4. Run again — auto-detects your GPU, pulls the image, starts the container
+./docker-start.sh
 ```
 
-Open `http://localhost:8000`. On first load, the default login is **`eyeris`**. Change your password immediately in **Settings**.
+Open **http://localhost:8000** — default username is `eyeris`, password is set on first run.
+
+> **NVIDIA users:** Install [`nvidia-container-toolkit`](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) on your host first. The script handles the rest.
 
 ---
 
-## 🖼️ Application Screenshots
+## Screenshots
 
 ### Gallery & Search
-![Gallery & Search](docs/screenshots/gallery.png)
+![Gallery](docs/screenshots/gallery.png)
 
 ### AI Tag Cloud
-![AI Tag Cloud](docs/screenshots/tags.png)
+![Tags](docs/screenshots/tags.png)
 
 ### System Dashboard
-![System Dashboard](docs/screenshots/dashboard.png)
+![Dashboard](docs/screenshots/dashboard.png)
 
 ### Blurry Photo Detection
-![Blurry Photo Detection](docs/screenshots/blurry.png)
+![Blurry](docs/screenshots/blurry.png)
 
 ---
 

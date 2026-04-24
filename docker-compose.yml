@@ -1,11 +1,8 @@
 services:
   eyeris:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: eyeris:dev
-    container_name: eyeris-dev
-    restart: on-failure
+    image: ghcr.io/vonhex/eyeris:latest
+    container_name: eyeris
+    restart: unless-stopped
     ports:
       - "8000:8000"
     env_file:
