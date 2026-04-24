@@ -443,14 +443,18 @@ def get_image(image_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{image_id}/thumbnail")
-def get_thumbnail(image_id: int, db: Session = Depends(get_db)):
-    img = db.query(Image).filter(Image.id == image_id).first()
-    if not img or not img.thumbnail_path:
-        raise HTTPException(status_code=404, detail="Thumbnail not found")
-
-    path = os.path.join(settings.THUMBNAIL_DIR, img.thumbnail_path)
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Thumbnail file missing")
+def get_thumbnail(image_id: int):
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        img = db.query(Image).filter(Image.id == image_id).first()
+        if not img or not img.thumbnail_path:
+            raise HTTPException(status_code=404, detail="Thumbnail not found")
+        path = os.path.join(settings.THUMBNAIL_DIR, img.thumbnail_path)
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404, detail="Thumbnail file missing")
+    finally:
+        db.close()
 
     return FileResponse(path, media_type="image/jpeg")
 

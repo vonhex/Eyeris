@@ -279,12 +279,12 @@ async def _sync_task(db: Session, job: ScanJob):
             await _discover_image(db, img_info)
             discovered += 1
             job.phase1_done = discovered
-            db.commit()
         except Exception as e:
             db.rollback()  # Crucial: clear the failed transaction state
             print(f"[Scanner] Skipping {img_info['filename']} due to error: {e}")
         
         if discovered % 10 == 0 or discovered == total:
+            db.commit() # Batch commit every 10 images
             print(f"[Scanner] Sync progress: {discovered}/{total}")
 
     job.phase1_done = discovered
@@ -385,7 +385,6 @@ async def _discover_image(db: Session, img_info: dict):
 
     # Load XMP tags if present
     await _load_xmp_for_image(db, new_img)
-    db.commit()
 
 
 
@@ -439,11 +438,10 @@ def _save_faces(db: Session, img_record: Image, face_data: list[dict], img_pil=N
             face_bbox=json.dumps(bbox),
             position=fd.get("position"),
             embedding=json.dumps(fd.get("embedding")) if fd.get("embedding") else None,
-            crop_path=crop_path
+            crop_path=crop_path,
         )
         db.add(face)
-    
-    db.commit()
+
     if img_record.face_count > 0:
         print(f"[Faces] Detected {img_record.face_count} faces in {img_record.filename}")
 
@@ -498,26 +496,25 @@ async def _load_xmp_for_image(db: Session, img_record: Image):
                     try:
                         tag = Tag(name=tag_name)
                         db.add(tag)
-                        db.flush()
                     except Exception:
-                        db.rollback()
                         tag = db.query(Tag).filter(Tag.name == tag_name).first()
 
                 if tag:
                     # 2. Check if link already exists in current session/DB
-                    exists = db.query(ImageTag).filter(
-                        ImageTag.image_id == img_record.id,
-                        ImageTag.tag_id == tag.id
-                    ).first()
+                    link_exists = False
+                    if tag.id:
+                        link_exists = db.query(ImageTag).filter(
+                            ImageTag.image_id == img_record.id,
+                            ImageTag.tag_id == tag.id
+                        ).first()
                     
-                    if not exists:
+                    if not link_exists:
                         try:
-                            db.add(ImageTag(image_id=img_record.id, tag_id=tag.id))
-                            db.flush()
+                            # Use object relationship to avoid needing tag.id immediately
+                            db.add(ImageTag(image=img_record, tag=tag))
                         except Exception:
-                            db.rollback() # Skip if it still fails
+                            pass # Skip if it still fails
 
-        db.commit()
         print(f"[XMP] Loaded {len(xmp_meta['tags'])} tags for {img_record.filename}")
 
     except Exception as e:
