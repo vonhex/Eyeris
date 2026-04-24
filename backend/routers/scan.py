@@ -114,16 +114,36 @@ def reset_database(db: Session = Depends(get_db)):
 
     # Truncate all tables — disable FK checks so order doesn't matter
     from sqlalchemy import text
+    is_sqlite = "sqlite" in str(db.get_bind().url)
+
     try:
-        db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+        if is_sqlite:
+            db.execute(text("PRAGMA foreign_keys = OFF"))
+        else:
+            db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+
         for tbl in ("faces", "image_tags", "image_categories", "images", "tags", "categories", "scan_jobs"):
-            db.execute(text(f"TRUNCATE TABLE {tbl}"))
-        db.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+            if is_sqlite:
+                db.execute(text(f"DELETE FROM {tbl}"))
+                db.execute(text(f"DELETE FROM sqlite_sequence WHERE name='{tbl}'"))
+            else:
+                db.execute(text(f"TRUNCATE TABLE {tbl}"))
+
+        if is_sqlite:
+            db.execute(text("PRAGMA foreign_keys = ON"))
+        else:
+            db.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
         db.commit()
     except Exception as e:
         db.rollback()
-        db.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-        print(f"[Reset] DB truncate error: {e}")
+        try:
+            if is_sqlite:
+                db.execute(text("PRAGMA foreign_keys = ON"))
+            else:
+                db.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+        except:
+            pass
+        print(f"[Reset] DB reset error: {e}")
         return {"status": "error", "message": str(e)}
 
     print("[Reset] Database cleared")
