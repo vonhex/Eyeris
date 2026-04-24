@@ -6,6 +6,4 @@ services:
       - render
       - video
     volumes:
-      - /sys/class/drm:/sys/class/drm:ro
-      - /sys/class/hwmon:/sys/class/hwmon:ro
-      - /sys/bus/pci/devices:/sys/bus/pci/devices:ro
+      - /sys:/sys:ro

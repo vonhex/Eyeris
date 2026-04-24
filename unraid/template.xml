@@ -13,7 +13,7 @@
   <WebUI>http://[IP]:[PORT:8000]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/vonhex/Eyeris/main/unraid/template.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/vonhex/Eyeris/main/eyeris-logo-icon2.png</Icon>
-  <ExtraParams>--group-add render --group-add video</ExtraParams>
+  <ExtraParams>--group-add render --group-add video -v /sys:/sys:ro</ExtraParams>
   <Description>AI-Powered Photo Organizer. Your Pictures. Fast. Easy. Simple.</Description>
 
   <!-- ── Ports ── -->
@@ -37,15 +37,6 @@
   <Config Name="Config file (.env)" Target="/app/.env" Default="/mnt/user/appdata/eyeris/eyeris.env"
           Description="Persistent config file — Eyeris reads and writes auth secrets here. Create an empty file at this path on first run."
           Type="Path" Display="always" Required="true" Mode="rw" Mask="false">/mnt/user/appdata/eyeris/eyeris.env</Config>
-
-  <!-- ── GPU monitoring sysfs (read-only — needed for Intel/AMD stats) ── -->
-  <Config Name="DRM sysfs (GPU monitoring)" Target="/sys/class/drm" Default="/sys/class/drm"
-          Description="Read-only sysfs mount required for Intel and AMD GPU monitoring. Leave as-is."
-          Type="Path" Display="advanced" Required="false" Mode="ro" Mask="false">/sys/class/drm</Config>
-
-  <Config Name="hwmon sysfs (GPU temp/freq)" Target="/sys/class/hwmon" Default="/sys/class/hwmon"
-          Description="Read-only sysfs mount required for GPU temperature and frequency monitoring. Leave as-is."
-          Type="Path" Display="advanced" Required="false" Mode="ro" Mask="false">/sys/class/hwmon</Config>
 
   <!-- ── GPU device passthrough ── -->
   <Config Name="Intel / AMD GPU device" Target="/dev/dri" Default="/dev/dri"
