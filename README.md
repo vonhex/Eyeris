@@ -147,21 +147,6 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 ---
 
-## Creating a Release
-
-Releases are automated via GitHub Actions. Push a version tag and the workflow will:
-1. Build the React frontend
-2. Package source + pre-built frontend into `.tar.gz` and `.zip` archives
-3. Build and push the Docker image to `ghcr.io/vonhex/eyeris` with version tags
-4. Create a GitHub Release with the archives and SHA-256 checksums attached
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
----
-
 ## How A-EYE fits in
 
 [A-EYE](https://github.com/SpaceinvaderOne/a-eye) is set up independently by the user (outside of Eyeris). It processes images on the NAS and writes `.xmp` sidecar files alongside them containing AI-generated descriptions, tags, and album names. During each scan, Eyeris reads those sidecars and ingests their content into the database — no configuration needed on the Eyeris side beyond having the NAS shares configured.
