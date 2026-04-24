@@ -61,6 +61,7 @@ class ImageSummary(BaseModel):
     location_name: str | None = None
     camera_model: str | None = None
     quality_flags: str | None = None  # JSON string
+    is_video: bool = False
     created_at: datetime
     tags: list[ImageTagOut] = []
     categories: list[ImageCategoryOut] = []

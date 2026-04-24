@@ -1,6 +1,7 @@
 import { useRef } from "react"
 import { Link } from "react-router-dom"
 import { thumbnailUrl } from "../api"
+const VIDEO_EXTENSIONS = new Set(["mp4", "mkv", "avi", "mov", "wmv", "webm", "m4v"])
 
 export default function ImageCard({ image, selectMode, selected, onToggleSelect, onLongPress }) {
   const pressTimer = useRef(null)
@@ -55,6 +56,15 @@ export default function ImageCard({ image, selectMode, selected, onToggleSelect,
       }`}
     >
       <div className="aspect-square overflow-hidden">
+{image.is_video || VIDEO_EXTENSIONS.has(image.filename.split(".").pop()?.toLowerCase()) && (
+  <div className="absolute inset-0 flex items-center justify-center z-10">
+    <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/30">
+      <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M8 5v14l11-7z" />
+      </svg>
+    </div>
+  </div>
+)}
         <img
           src={thumbnailUrl(image.id, image.thumbnail_path)}
           alt={image.filename}

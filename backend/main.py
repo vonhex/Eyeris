@@ -114,6 +114,17 @@ async def lifespan(app_instance: FastAPI):
             if "quality_flags" not in img_cols:
                 conn.execute(text("ALTER TABLE images ADD COLUMN quality_flags TEXT NULL"))
                 print("[Startup] Added images.quality_flags")
+            if "is_video" not in img_cols:
+                conn.execute(text("ALTER TABLE images ADD COLUMN is_video TINYINT(1) NOT NULL DEFAULT 0"))
+                conn.execute(text("ALTER TABLE images ADD INDEX ix_images_is_video (is_video)"))
+                print("[Startup] Added images.is_video")
+            
+            # Backfill is_video based on filename extensions
+            v_exts = "('.mp4', '.mkv', '.avi', '.mov', '.wmv', '.webm', '.m4v')"
+            for ext in [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".m4v"]:
+                res = conn.execute(text(f"UPDATE images SET is_video = 1 WHERE filename LIKE '%{ext}' AND is_video = 0"))
+                if res.rowcount > 0:
+                    print(f"[Startup] Backfilled is_video=1 for {res.rowcount} {ext} files")
     except Exception as e:
         print(f"[Startup] Image migration: {e}")
 

@@ -161,8 +161,9 @@ NAS share
 
 ## Features
 
-- **Automatic NAS scanning** — Recursively discovers images across SMB/CIFS shares
-- **A-EYE tag ingestion** — Reads XMP sidecars written by A-EYE (descriptions, tags, albums)
+- **Automatic NAS scanning** — Recursively discovers images and videos across SMB/CIFS shares
+- **A-EYE tag ingestion** — Reads XMP sidecars written by A-EYE (descriptions, tags, albums). *Note: A-EYE currently only supports images; videos can be manually tagged in Eyeris.*
+- **Video Playback** — Built-in support for common video formats (.mp4, .mkv, .mov, etc.) with in-browser playback.
 - **Face detection & grouping** — Detects faces with YOLOv8, extracts FaceNet embeddings, clusters into people
 - **Duplicate detection** — SHA-256 deduplication + perceptual hash visual similarity grouping
 - **EXIF & GPS metadata** — Date taken, camera model, GPS coordinates with reverse geocoding

@@ -13,6 +13,7 @@ const SENTIMENT_COLORS = {
 const IMAGES_KEY = "gallery_images"
 const FILTERS_KEY = "gallery_filters"
 const TOTAL_KEY = "gallery_total"
+const VIDEO_EXTENSIONS = new Set(["mp4", "mkv", "avi", "mov", "wmv", "webm", "m4v"])
 
 export default function ImageDetail() {
   const { id } = useParams()
@@ -271,39 +272,58 @@ export default function ImageDetail() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        <div className="lg:flex-1 relative" ref={containerRef}>
-          <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800">
-            <img
-              ref={imgRef}
-              src={fullImageUrl(image.id)}
-              alt={image.filename}
-              className="w-full h-auto max-h-[75vh] object-contain transition-transform duration-100"
-              style={{ transform: `scale(${scale})`, transformOrigin: "center center" }}
-            />
+        <div className="lg:flex-1 flex items-center gap-2 min-h-0">
+          {/* Side Navigation: Previous */}
+          <div className="w-12 flex-shrink-0 flex items-center justify-center">
+            {prevId && (
+              <button
+                onClick={goPrev}
+                className="w-10 h-10 bg-gray-800 hover:bg-gray-700 text-white rounded-full flex items-center justify-center transition shadow-lg border border-gray-700"
+                title="Previous (Left Arrow)"
+              >
+                <span className="text-lg">&larr;</span>
+              </button>
+            )}
           </div>
-          {scale > 1 && (
-            <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-              {Math.round(scale * 100)}% · double-tap to reset
+
+          <div className="flex-1 relative min-w-0" ref={containerRef}>
+            <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800 shadow-2xl">
+              {image.is_video || VIDEO_EXTENSIONS.has(image.filename.split('.').pop()?.toLowerCase()) ? (
+                <video
+                  src={fullImageUrl(image.id)}
+                  controls
+                  autoPlay
+                  className="w-full h-auto max-h-[75vh] object-contain"
+                />
+              ) : (
+                <img
+                  ref={imgRef}
+                  src={fullImageUrl(image.id)}
+                  alt={image.filename}
+                  className="w-full h-auto max-h-[75vh] object-contain transition-transform duration-100"
+                  style={{ transform: `scale(${scale})`, transformOrigin: "center center" }}
+                />
+              )}
             </div>
-          )}
-          {prevId && (
-            <button
-              onClick={goPrev}
-              className="absolute left-0 top-0 w-1/4 h-full opacity-0 hover:opacity-100 flex items-center justify-start pl-2 cursor-pointer"
-              title="Previous (Left Arrow)"
-            >
-              <span className="bg-black/50 text-white rounded-full w-10 h-10 flex items-center justify-center text-lg">&larr;</span>
-            </button>
-          )}
-          {(nextId || atEnd) && (
-            <button
-              onClick={goNext}
-              className="absolute right-0 top-0 w-1/4 h-full opacity-0 hover:opacity-100 flex items-center justify-end pr-2 cursor-pointer"
-              title="Next (Right Arrow)"
-            >
-              <span className="bg-black/50 text-white rounded-full w-10 h-10 flex items-center justify-center text-lg">&rarr;</span>
-            </button>
-          )}
+            {scale > 1 && !image.is_video && (
+              <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                {Math.round(scale * 100)}% · double-tap to reset
+              </div>
+            )}
+          </div>
+
+          {/* Side Navigation: Next */}
+          <div className="w-12 flex-shrink-0 flex items-center justify-center">
+            {(nextId || atEnd) && (
+              <button
+                onClick={goNext}
+                className="w-10 h-10 bg-gray-800 hover:bg-gray-700 text-white rounded-full flex items-center justify-center transition shadow-lg border border-gray-700"
+                title="Next (Right Arrow)"
+              >
+                <span className="text-lg">&rarr;</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="lg:w-80 space-y-4">
@@ -353,7 +373,7 @@ export default function ImageDetail() {
             {image.album && (
               <div>
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Album</h3>
-                <Link to={`/albums/${encodeURIComponent(image.album)}`} className="text-sm text-blue-400 hover:text-blue-300">
+                <Link to={`/?album=${encodeURIComponent(image.album)}`} className="text-sm text-blue-400 hover:text-blue-300">
                   {image.album}
                 </Link>
               </div>

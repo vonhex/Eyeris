@@ -4,7 +4,10 @@ from io import BytesIO
 
 from config import settings
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".heic"}
+SUPPORTED_EXTENSIONS = {
+    ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".heic",
+    ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".m4v"
+}
 
 MOUNT_BASE = "/mnt/nas"
 
@@ -36,7 +39,7 @@ def list_images(share: str, subdir: str = "") -> list[dict]:
             if name.startswith("."):
                 continue
             ext = os.path.splitext(name)[1].lower()
-            if ext not in IMAGE_EXTENSIONS:
+            if ext not in SUPPORTED_EXTENSIONS:
                 continue
             full = os.path.join(dirpath, name)
             rel_path = os.path.relpath(full, mount_path).replace("\\", "/")

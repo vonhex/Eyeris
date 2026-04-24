@@ -230,6 +230,70 @@ def parse_xmp_metadata(xmp_data: bytes) -> dict:
     }
 
 
+import subprocess
+
+VIDEO_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".m4v"}
+
+def is_video(filename: str) -> bool:
+    return os.path.splitext(filename)[1].lower() in VIDEO_EXTENSIONS
+
+def process_video_file(path: str) -> dict:
+    """Extract video metadata and generate a thumbnail from the middle of the video."""
+    file_hash = ""
+    with open(path, "rb") as f:
+        file_hash = compute_hash(f.read())
+
+    # Get metadata
+    width, height = 0, 0
+    date_taken = None
+    try:
+        cmd = [
+            "ffprobe", "-v", "quiet", "-print_format", "json",
+            "-show_streams", "-show_format", path
+        ]
+        out = subprocess.check_output(cmd).decode("utf-8")
+        data = json.loads(out)
+        
+        for s in data.get("streams", []):
+            if s.get("codec_type") == "video":
+                width = int(s.get("width", 0))
+                height = int(s.get("height", 0))
+                break
+        
+        # Try to find creation time
+        tags = data.get("format", {}).get("tags", {})
+        ct = tags.get("creation_time")
+        if ct:
+            try:
+                date_taken = datetime.fromisoformat(ct.replace("Z", "+00:00"))
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[Video] Meta error for {path}: {e}")
+
+    # Generate thumbnail
+    thumb_filename = f"{uuid.uuid4().hex}.jpg"
+    thumb_path = os.path.join(settings.THUMBNAIL_DIR, thumb_filename)
+    try:
+        # Seek to 1s or middle to get a good frame
+        subprocess.run([
+            "ffmpeg", "-ss", "00:00:01", "-i", path,
+            "-frames:v", "1", "-q:v", "2", thumb_path, "-y", "-loglevel", "quiet"
+        ], check=True)
+    except Exception as e:
+        print(f"[Video] Thumb error for {path}: {e}")
+        # Placeholder? Or just fail
+    
+    return {
+        "file_hash": file_hash,
+        "width": width,
+        "height": height,
+        "thumbnail_path": thumb_filename,
+        "date_taken": date_taken,
+        "quality_flags": json.dumps({"is_video": True}),
+        "is_video": True
+    }
+
 def process_image_bytes(data: bytes) -> dict:
     """
     Process raw image bytes: correct orientation, generate thumbnail, extract metadata.

@@ -112,6 +112,7 @@ def search_images_db(
     page_size: int = 48,
     analyzed_only: bool = False,
     favorite: bool | None = None,
+    is_video: bool = False,
 ) -> dict:
     """
     Search images in MariaDB using weighted keyword relevance across multiple columns.
@@ -203,6 +204,10 @@ def search_images_db(
     if favorite is not None:
         params["fav"] = 1 if favorite else 0
         extra_where.append("i.favorite = :fav")
+    
+    params["is_vid"] = 1 if is_video else 0
+    extra_where.append("i.is_video = :is_vid")
+
     if tag:
         params["tag_filter"] = tag.lower()
         extra_where.append(

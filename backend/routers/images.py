@@ -34,6 +34,10 @@ def _image_to_summary(img: Image) -> ImageSummary:
         album=img.album,
         favorite=img.favorite,
         date_taken=img.date_taken,
+        location_name=img.location_name,
+        camera_model=img.camera_model,
+        quality_flags=img.quality_flags,
+        is_video=img.is_video,
         created_at=img.created_at,
         tags=[
             ImageTagOut(tag_id=it.tag.id, tag_name=it.tag.name)
@@ -71,6 +75,7 @@ def list_images(
     quality_issue: str | None = None,  # "blur" | "overexposed" | "underexposed" | "any"
     has_gps: bool | None = None,
     untagged: bool | None = None,
+    is_video: bool = Query(False),
     sort: str | None = Query(None, pattern="^(date_taken|date_added|filename)_(asc|desc)$|^random$"),
     db: Session = Depends(get_db),
 ):
@@ -85,6 +90,7 @@ def list_images(
                 page=page, page_size=page_size,
                 analyzed_only=analyzed_only,
                 favorite=favorite,
+                is_video=is_video,
             )
             if result["ids"]:
                 images = (
@@ -121,6 +127,9 @@ def list_images(
         id_query = id_query.filter(Image.analyzed == True)
     if favorite is not None:
         id_query = id_query.filter(Image.favorite == favorite)
+    
+    id_query = id_query.filter(Image.is_video == is_video)
+
     if date_from:
         id_query = id_query.filter(Image.date_taken >= date_from)
     if date_to:
@@ -233,6 +242,7 @@ def list_image_ids(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     untagged: bool | None = None,
+    is_video: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     """Return all image IDs matching the current filters (no pagination). Used for Select All."""
@@ -244,6 +254,9 @@ def list_image_ids(
             q = q.filter(Image.source_folder == folder)
     if favorite is not None:
         q = q.filter(Image.favorite == favorite)
+    
+    q = q.filter(Image.is_video == is_video)
+
     if date_from:
         q = q.filter(Image.date_taken >= date_from)
     if date_to:
@@ -443,51 +456,63 @@ def get_thumbnail(image_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{image_id}/file")
-async def get_full_image(image_id: int, db: Session = Depends(get_db)):
-    img = db.query(Image).filter(Image.id == image_id).first()
-    if not img:
-        raise HTTPException(status_code=404, detail="Image not found")
+async def get_full_image(image_id: int):
+    # Use a short-lived session to fetch the image and close it immediately
+    # before returning FileResponse, to avoid holding connections open during streaming.
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        img = db.query(Image).filter(Image.id == image_id).first()
+        if not img:
+            raise HTTPException(status_code=404, detail="Image not found")
+        file_path = img.file_path
+        filename = img.filename
+    finally:
+        db.close()
 
-    import asyncio
-    from services.smb_service import read_file_bytes
-
-    parts = img.file_path.split("/", 1)
+    from services.smb_service import _local_path
+    parts = file_path.split("/", 1)
     share = parts[0]
     rel_path = parts[1] if len(parts) > 1 else ""
+    local_path = _local_path(share, rel_path)
 
-    try:
-        data = await asyncio.to_thread(read_file_bytes, share, rel_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
+    if not os.path.exists(local_path):
+        raise HTTPException(status_code=404, detail="File not found on NAS")
 
-    ext = img.filename.rsplit(".", 1)[-1].lower()
+    ext = filename.rsplit(".", 1)[-1].lower()
     media_types = {
         "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
         "gif": "image/gif", "webp": "image/webp", "bmp": "image/bmp",
         "tiff": "image/tiff", "tif": "image/tiff", "heic": "image/heic",
+        "mp4": "video/mp4", "mkv": "video/x-matroska", "mov": "video/quicktime",
+        "avi": "video/x-msvideo", "wmv": "video/x-ms-wmv", "webm": "video/webm",
+        "m4v": "video/x-m4v"
     }
+    content_type = media_types.get(ext, "application/octet-stream")
 
-    from fastapi.responses import Response
-    from PIL import Image as PILImage
-    from services.image_service import correct_orientation
+    # Only attempt orientation correction for certain image types
+    if ext in ("jpg", "jpeg", "png", "webp"):
+        from fastapi.responses import Response
+        from PIL import Image as PILImage
+        from services.image_service import correct_orientation
+        from io import BytesIO
 
-    try:
-        pil = PILImage.open(BytesIO(data))
-        pil, corrected = correct_orientation(pil)
-        if corrected:
-            buf = BytesIO()
-            fmt = "JPEG" if ext in ("jpg", "jpeg") else ext.upper()
-            save_kwargs = {"quality": 95, "subsampling": 0} if fmt == "JPEG" else {}
-            if pil.mode in ("RGBA", "P", "LA") and fmt == "JPEG":
-                pil = pil.convert("RGB")
-            pil.save(buf, format=fmt, **save_kwargs)
-            data = buf.getvalue()
-    except Exception:
-        pass  # serve original bytes if correction fails
+        try:
+            with open(local_path, "rb") as f:
+                data = f.read()
+            img_pil = PILImage.open(BytesIO(data))
+            img_pil, corrected = correct_orientation(img_pil)
+            if corrected:
+                buf = BytesIO()
+                fmt = "JPEG" if ext in ("jpg", "jpeg") else ext.upper()
+                if img_pil.mode in ("RGBA", "P", "LA") and fmt == "JPEG":
+                    img_pil = img_pil.convert("RGB")
+                img_pil.save(buf, format=fmt, quality=95)
+                return Response(content=buf.getvalue(), media_type=content_type)
+        except Exception:
+            pass
 
-    return Response(content=data, media_type=media_types.get(ext, "application/octet-stream"))
-
-
+    return FileResponse(local_path, media_type=content_type)
 @router.delete("/{image_id}")
 async def delete_image(image_id: int, db: Session = Depends(get_db)):
     img = db.query(Image).filter(Image.id == image_id).first()

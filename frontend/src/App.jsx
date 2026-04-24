@@ -15,6 +15,7 @@ import Login from "./pages/Login"
 const navItems = [
   { to: "/", label: "Gallery", end: true },
   { to: "/?favorite=true", label: "Favorites", end: false, exact: false },
+  { to: "/?is_video=true", label: "Videos", end: false },
   { to: "/?untagged=true", label: "Untagged", end: false },
   { to: "/people", label: "People" },
   { to: "/tags", label: "Tags" },
@@ -133,7 +134,7 @@ function AppNavLink({ to, label }) {
   } else if (target.pathname === "/") {
     // Gallery root — only active when no special single-tab params are set
     const sp = new URLSearchParams(location.search)
-    isActive = samePath && !sp.get("favorite") && !sp.get("untagged")
+    isActive = samePath && !sp.get("favorite") && !sp.get("untagged") && !sp.get("is_video")
   } else {
     // Regular path-based tab
     isActive = samePath

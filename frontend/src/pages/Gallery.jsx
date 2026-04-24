@@ -29,9 +29,10 @@ export default function Gallery() {
   const quality_issue = searchParams.get("quality_issue") || null
   const has_gps = searchParams.get("has_gps") === "true" ? true : null
   const untagged = searchParams.get("untagged") === "true" ? true : null
+  const is_video = searchParams.get("is_video") === "true" ? true : null
 
-  const filters = { folder, tag, category, search, cluster_id, favorite, date_from, date_to, location, camera, quality_issue, has_gps, untagged }
-  const filtersKey = JSON.stringify({ folder, tag, category, search, sort, cluster_id, favorite, date_from, date_to, location, camera, quality_issue, has_gps, untagged })
+  const filters = { folder, tag, category, search, cluster_id, favorite, date_from, date_to, location, camera, quality_issue, has_gps, untagged, is_video }
+  const filtersKey = JSON.stringify({ folder, tag, category, search, sort, cluster_id, favorite, date_from, date_to, location, camera, quality_issue, has_gps, untagged, is_video })
 
   const [images, setImages] = useState([])
   const [total, setTotal] = useState(0)
@@ -99,6 +100,7 @@ export default function Gallery() {
         if (camera) activeFilters.camera = camera
         if (quality_issue) activeFilters.quality_issue = quality_issue
         if (has_gps !== null) activeFilters.has_gps = has_gps
+        if (is_video !== null) activeFilters.is_video = is_video
         sessionStorage.setItem("gallery_filters", JSON.stringify(activeFilters))
       }
     }
@@ -126,6 +128,7 @@ export default function Gallery() {
         if (quality_issue) params.quality_issue = quality_issue
         if (has_gps !== null) params.has_gps = has_gps
         if (untagged) params.untagged = true
+        if (is_video) params.is_video = true
 
         const data = await getImages(params)
         if (id !== fetchRef.current) return
@@ -227,6 +230,7 @@ export default function Gallery() {
     if (date_from) params.date_from = date_from
     if (date_to) params.date_to = date_to
     if (untagged) params.untagged = true
+    if (is_video) params.is_video = true
 
     const data = await getImageIds(params)
     setSelected(new Set(data.ids))

@@ -82,35 +82,37 @@ export default function FilterSidebar({ filters, onFilterChange, open, onClose }
           </div>
 
           {/* Folders */}
-          <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Source Folder</h3>
-            <button
-              onClick={() => handleFilter({ ...filters, folder: null })}
-              className={`block w-full text-left text-sm px-2 py-1 rounded ${
-                !filters.folder ? "bg-blue-600/20 text-blue-400" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              All Folders
-            </button>
-            <div className="max-h-64 overflow-y-auto space-y-0.5">
-              {folders.map((f) => {
-                const label = f.folder.split('/').slice(-2).join('/') || f.folder
-                return (
-                  <button
-                    key={f.folder}
-                    onClick={() => handleFilter({ ...filters, folder: f.folder })}
-                    className={`flex justify-between w-full text-left text-sm px-2 py-1 rounded transition ${
-                      filters.folder === f.folder ? "bg-blue-600/20 text-blue-400" : "text-gray-400 hover:text-white"
-                    }`}
-                    title={f.folder}
-                  >
-                    <span className="truncate">{label}</span>
-                    <span className="text-xs text-gray-600 ml-1 shrink-0">{f.total}</span>
-                  </button>
-                )
-              })}
+          {!filters.is_video && (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Source Folder</h3>
+              <button
+                onClick={() => handleFilter({ ...filters, folder: null })}
+                className={`block w-full text-left text-sm px-2 py-1 rounded ${
+                  !filters.folder ? "bg-blue-600/20 text-blue-400" : "text-gray-400 hover:text-white"
+                }`}
+              >
+                All Folders
+              </button>
+              <div className="max-h-64 overflow-y-auto space-y-0.5">
+                {folders.map((f) => {
+                  const label = f.folder.split('/').slice(-2).join('/') || f.folder
+                  return (
+                    <button
+                      key={f.folder}
+                      onClick={() => handleFilter({ ...filters, folder: f.folder })}
+                      className={`flex justify-between w-full text-left text-sm px-2 py-1 rounded transition ${
+                        filters.folder === f.folder ? "bg-blue-600/20 text-blue-400" : "text-gray-400 hover:text-white"
+                      }`}
+                      title={f.folder}
+                    >
+                      <span className="truncate">{label}</span>
+                      <span className="text-xs text-gray-600 ml-1 shrink-0">{f.total}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Categories */}
           {categories.length > 0 && (
@@ -140,7 +142,7 @@ export default function FilterSidebar({ filters, onFilterChange, open, onClose }
           )}
 
           {/* Tags */}
-          {tags.length > 0 && (
+          {tags.length > 0 && !filters.is_video && (
             <div>
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tags</h3>
               <div className="flex flex-wrap gap-1 max-h-64 overflow-y-auto">
@@ -163,7 +165,7 @@ export default function FilterSidebar({ filters, onFilterChange, open, onClose }
           )}
 
           {/* Location */}
-          {locations.length > 0 && (
+          {locations.length > 0 && !filters.is_video && (
             <div>
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Location</h3>
               <button
@@ -200,7 +202,7 @@ export default function FilterSidebar({ filters, onFilterChange, open, onClose }
           )}
 
           {/* Camera */}
-          {cameras.length > 0 && (
+          {cameras.length > 0 && !filters.is_video && (
             <div>
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Camera</h3>
               <button

@@ -35,6 +35,7 @@ class Image(Base):
     location_name = Column(String(255), nullable=True, index=True)
     # Quality analysis flags (JSON: {"blur": bool, "overexposed": bool, "underexposed": bool, "blur_score": float})
     quality_flags = Column(Text, nullable=True)
+    is_video = Column(Boolean, default=False, nullable=False, server_default="0", index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

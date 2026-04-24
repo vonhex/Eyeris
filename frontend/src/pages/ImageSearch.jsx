@@ -278,7 +278,7 @@ function SearchResult({ result, selected, onToggle, onExpand }) {
       className={`relative group cursor-pointer rounded-lg overflow-hidden bg-gray-900 border-2 transition ${
         selected ? "border-blue-500" : "border-transparent hover:border-gray-600"
       }`}
-      onClick={() => onToggle(result.url)}
+      onClick={(e) => { e.stopPropagation(); onExpand() }}
       title={result.title || result.source}
     >
       <div className="aspect-square w-full bg-gray-800 relative">
@@ -358,7 +358,7 @@ function SearchResult({ result, selected, onToggle, onExpand }) {
       )}
 
       {/* Checkbox indicator */}
-      <div className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${
+      <button onClick={(e) => { e.stopPropagation(); onToggle(result.url) }} className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${
         selected
           ? "bg-blue-500 border-blue-500"
           : "bg-black/40 border-gray-500 opacity-0 group-hover:opacity-100"
@@ -368,7 +368,7 @@ function SearchResult({ result, selected, onToggle, onExpand }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
           </svg>
         )}
-      </div>
+      </button>
 
       {/* Title on hover */}
       {result.title && (
@@ -487,11 +487,11 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
         ref={imgContainerRef}
       >
         {/* Image/Video Container */}
-        <div className="relative flex items-center justify-center w-full bg-gray-900 rounded-xl overflow-hidden">
+        <div className={`relative flex items-center justify-center w-full bg-gray-900 rounded-xl overflow-hidden ${isVideo ? "aspect-video" : ""}`}>
           {isVideo ? (
             result.iframe_src ? (
               <iframe
-                src={result.iframe_src}
+                src={result.iframe_src + (result.iframe_src.includes("?") ? "&autoplay=1&mute=1" : "?autoplay=1&mute=1")}
                 className="w-full h-full border-0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -589,7 +589,7 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
               Visit Source
             </a>
           )}
-          {!isVideo && (
+          {true && (
             <button
               onClick={() => onToggle(result.url)}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${

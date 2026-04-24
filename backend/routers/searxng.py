@@ -79,7 +79,7 @@ async def search_web(
 
 
 @router.get("/proxy")
-async def proxy_image(url: str = Query(...)):
+async def proxy_image(url: str = Query(...), token: str = Query(None)):
     """Proxy an external image URL through the backend to avoid CORS issues."""
     _validate_url(url)
     parsed = urlparse(url)
