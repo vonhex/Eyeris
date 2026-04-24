@@ -135,6 +135,7 @@ def extract_camera_model(img: Image.Image) -> str | None:
 
 def generate_thumbnail(img: Image.Image) -> str:
     """Create a thumbnail and save to disk. Returns the thumbnail filename."""
+    os.makedirs(settings.THUMBNAIL_DIR, exist_ok=True)
     thumb = img.copy()
     thumb.thumbnail(settings.THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
 
@@ -272,6 +273,7 @@ def process_video_file(path: str) -> dict:
         print(f"[Video] Meta error for {path}: {e}")
 
     # Generate thumbnail
+    os.makedirs(settings.THUMBNAIL_DIR, exist_ok=True)
     thumb_filename = f"{uuid.uuid4().hex}.jpg"
     thumb_path = os.path.join(settings.THUMBNAIL_DIR, thumb_filename)
     try:
