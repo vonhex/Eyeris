@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom"
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense, ErrorBoundary } from "react"
 import Gallery from "./pages/Gallery"
 import ImageDetail from "./pages/ImageDetail"
 import Dashboard from "./pages/Dashboard"
@@ -10,7 +10,7 @@ import Settings from "./pages/Settings"
 import ImageSearch from "./pages/ImageSearch"
 import Duplicates from "./pages/Duplicates"
 import Blurry from "./pages/Blurry"
-import { getScanStatus, stopScan } from "./api"
+import Login from "./pages/Login"
 
 const navItems = [
   { to: "/", label: "Gallery", end: true },
@@ -24,6 +24,46 @@ const navItems = [
   { to: "/search", label: "Web Search" },
   { to: "/settings", label: "Settings" },
 ]
+
+function isAuthenticated() {
+  const token = localStorage.getItem("eyeris_auth_token")
+  if (!token || token === "ready") return false
+  // JWT tokens are three dot-separated base64 segments, minimum length ~30
+  return typeof token === "string" && token.includes(".") && token.length > 30
+}
+
+import { getScanStatus, stopScan } from "./api"
+
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="text-gray-400 text-lg animate-pulse">Loading…</div>
+    </div>
+  )
+}
+
+function ErrorFallback({ error, reset }) {
+  return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-8">
+      <div className="max-w-md text-center space-y-4">
+        <h2 className="text-xl font-bold text-white">Something went wrong</h2>
+        <pre className="text-red-400 text-sm bg-gray-900 rounded p-4 overflow-auto max-h-60">{String(error)}</pre>
+        <button onClick={reset} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+          Retry
+        </button>
+        <button
+          onClick={() => {
+            localStorage.removeItem("eyeris_auth_token")
+            window.location.href = "/login"
+          }}
+          className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition block ml-auto"
+        >
+          Log out
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function PhashStatusBar() {
   const [job, setJob] = useState(null)
@@ -63,32 +103,43 @@ function PhashStatusBar() {
   )
 }
 
-function App() {
+function MainApp() {
   return (
-    <BrowserRouter>
-      <div className="min-h-screen flex flex-col">
-        <nav className="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center gap-1 overflow-x-auto">
-          <div className="flex items-center gap-2 mr-4 shrink-0">
-            <img src="/eyeris-logo-icon.png" alt="Eyeris" className="h-7 w-7 rounded bg-white p-0.5 object-contain" />
-            <span className="text-xl font-bold text-white tracking-wide">eyeris</span>
-          </div>
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end !== false}
-              className={({ isActive }) =>
-                `px-3 py-1.5 rounded text-sm font-medium transition whitespace-nowrap ${
-                  isActive ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-        <PhashStatusBar />
-        <main className="flex-1">
+    <div className="min-h-screen flex flex-col">
+      <nav className="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-2 mr-4 shrink-0">
+          <img src="/eyeris-logo-icon.png" alt="Eyeris" className="h-7 w-7 rounded bg-white p-0.5 object-contain" />
+          <span className="text-xl font-bold text-white tracking-wide">eyeris</span>
+        </div>
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end !== false}
+            className={({ isActive }) =>
+              `px-3 py-1.5 rounded text-sm font-medium transition whitespace-nowrap ${
+                isActive ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
+              }`
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
+        <div className="ml-auto shrink-0">
+          <button
+            onClick={() => {
+              localStorage.removeItem("eyeris_auth_token")
+              window.location.href = "/login"
+            }}
+            className="px-3 py-1.5 rounded text-sm font-medium text-gray-400 hover:text-white transition whitespace-nowrap"
+          >
+            Logout
+          </button>
+        </div>
+      </nav>
+      <PhashStatusBar />
+      <main className="flex-1">
+        <Suspense fallback={<LoadingScreen />} key={location.pathname}>
           <Routes>
             <Route path="/" element={<Gallery />} />
             <Route path="/image/:id" element={<ImageDetail />} />
@@ -101,10 +152,29 @@ function App() {
             <Route path="/duplicates" element={<Duplicates />} />
             <Route path="/blurry" element={<Blurry />} />
           </Routes>
-        </main>
-      </div>
-    </BrowserRouter>
+        </Suspense>
+      </main>
+    </div>
   )
 }
 
-export default App
+function ProtectedRoute() {
+  const authenticated = isAuthenticated()
+  if (!authenticated) return <Login />
+  return (
+    <ErrorBoundary fallback={ErrorFallback}>
+      <MainApp />
+    </ErrorBoundary>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<ProtectedRoute />} />
+      </Routes>
+    </BrowserRouter>
+  )
+}

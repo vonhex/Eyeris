@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { getSettings, updateSettings, resetDatabase } from "../api"
+import { getSettings, updateSettings, resetDatabase, changePassword } from "../api"
 
 export default function Settings() {
   const [settings, setSettings] = useState(null)
@@ -9,6 +9,10 @@ export default function Settings() {
   const [message, setMessage] = useState(null)
   const [newShare, setNewShare] = useState("")
   const [smbPassword, setSmbPassword] = useState("")
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState(null)
 
   useEffect(() => {
     getSettings()
@@ -216,6 +220,68 @@ export default function Settings() {
       >
         {saving ? "Saving..." : "Save Settings"}
       </button>
+
+      {/* Change Password */}
+      <div className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+        <h3 className="text-lg font-medium text-white mb-4">Change Password</h3>
+        {passwordMessage && (
+          <div className={`px-3 py-2 rounded text-sm mb-3 ${
+            passwordMessage.type === "success" ? "bg-green-900/50 text-green-300 border border-green-800" : "bg-red-900/50 text-red-300 border border-red-800"
+          }`}>
+            {passwordMessage.text}
+          </div>
+        )}
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            setChangingPassword(true)
+            setPasswordMessage(null)
+            try {
+              await changePassword(currentPassword, newPassword)
+              setPasswordMessage({ type: "success", text: "Password updated. You'll be logged out." })
+              setCurrentPassword("")
+              setNewPassword("")
+              setTimeout(() => {
+                localStorage.removeItem("eyeris_auth_token")
+                window.location.href = "/login"
+              }, 1500)
+            } catch (err) {
+              setPasswordMessage({ type: "error", text: err.response?.data?.detail || err.message || "Failed to change password" })
+            }
+            setChangingPassword(false)
+          }}
+          className="space-y-3"
+        >
+          <Field label="Current Password">
+            <input
+              type="password"
+              required
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="input-field"
+              placeholder="Current password"
+            />
+          </Field>
+          <Field label="New Password">
+            <input
+              type="password"
+              required
+              minLength={4}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="input-field"
+              placeholder="New password (min 4 chars)"
+            />
+          </Field>
+          <button
+            type="submit"
+            disabled={changingPassword}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition"
+          >
+            {changingPassword ? "Updating…" : "Update Password"}
+          </button>
+        </form>
+      </div>
 
       {/* Danger Zone */}
       <div className="bg-gray-900 border border-red-900/50 rounded-lg p-5">

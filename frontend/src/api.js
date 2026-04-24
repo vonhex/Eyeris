@@ -2,6 +2,28 @@ import axios from "axios"
 
 const api = axios.create({ baseURL: "/api" })
 
+// Attach JWT token to all requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("eyeris_auth_token")
+  if (token) {
+    config.headers["Authorization"] = `Bearer ${token}`
+  }
+  return config
+})
+
+// Handle 401 responses — redirect to login on frontend
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem("eyeris_auth_token")
+      // Signal that auth is required
+      window.dispatchEvent(new CustomEvent("eyeris-auth-require"))
+    }
+    return Promise.reject(error)
+  }
+)
+
 export const getImages = (params) => api.get("/images", { params }).then((r) => r.data)
 export const getImageIds = (params) => api.get("/images/ids", { params }).then((r) => r.data)
 export const getImage = (id) => api.get(`/images/${id}`).then((r) => r.data)
@@ -54,3 +76,32 @@ export const deleteSmartAlbum = (id) => api.delete(`/smart-albums/${id}`).then((
 export const searxngSearch = (q, page = 1, category = "images") => api.get("/searxng/search", { params: { q, page, category } }).then((r) => r.data)
 export const searxngDownload = (urls, share, subfolder) => api.post("/searxng/download", { urls, share, subfolder }).then((r) => r.data)
 export const searxngProxyUrl = (url) => `/api/searxng/proxy?url=${encodeURIComponent(url)}`
+
+// Auth endpoints — use direct fetch to avoid /api prefix conflicts
+const authFetch = (path, options) => fetch(`/api${path}`, options).then((r) => r.json())
+
+export const getAuthStatus = () => fetch("/auth/status").then((r) => r.json())
+export const setupPassword = (password) => fetch("/auth/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) }).then((r) => r.json())
+export const autoSetup = () => fetch("/auth/auto-setup", { method: "POST" }).then((r) => r.json())
+export const login = (password) => fetch("/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) }).then(async (r) => {
+  const data = await r.json()
+  if (!r.ok) {
+    const err = new Error(data.detail || "Login failed")
+    err.response = { data }
+    throw err
+  }
+  return data
+})
+export const changePassword = (current, newPass) => fetch("/auth/change-password", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ current_password: current, new_password: newPass }) }).then(async (r) => {
+  const data = await r.json()
+  if (!r.ok) {
+    const err = new Error(data.detail || "Failed to change password")
+    err.response = { data }
+    throw err
+  }
+  return data
+})
+export const logout = () => {
+  localStorage.removeItem("eyeris_auth_token")
+  return fetch("/auth/logout", { method: "POST" }).then((r) => r.json())
+}
