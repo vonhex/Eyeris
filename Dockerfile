@@ -38,7 +38,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libgomp1 \
         libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /tmp/*
+    && rm -rf /tmp/* \
+    && groupadd -f -g 44 video \
+    && groupadd -f -g 104 render
 
 # Python deps
 WORKDIR /app/backend
