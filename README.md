@@ -7,7 +7,7 @@
 > [!WARNING]
 > **Eyeris is designed for use on a trusted local network only.** It has no brute-force protection on the login endpoint, no multi-user access control, and image URLs embed session tokens that appear in server logs. Do not expose it directly to the internet. If you need remote access, use a VPN or put it behind Cloudflare Access — not a plain public tunnel.
 
-Eyeris is a full-stack, self-hosted image management platform for large personal or home-lab photo libraries stored on NAS/SMB storage. It handles discovery, deduplication, metadata extraction, face grouping, and browsing. AI analysis (descriptions, tags, categories, albums, sentiment) is provided by **A-EYE**, a separate tool you run yourself that writes XMP sidecar files back to the NAS. Eyeris picks those up automatically during each scan. Built-in GPU models handle NSFW detection and face detection/clustering independently of A-EYE.
+Eyeris is a full-stack, self-hosted image management platform for large personal or home-lab photo libraries stored on NAS/SMB storage. It handles discovery, deduplication, metadata extraction, face grouping, and browsing. AI analysis (descriptions, tags, categories, albums, sentiment) is provided by **A-EYE**, a separate tool you run yourself that writes XMP sidecar files back to the NAS. Eyeris picks those up automatically during each scan. Built-in GPU models handle face detection and clustering independently of A-EYE.
 
 ---
 
@@ -31,7 +31,7 @@ docker run -d \
 
 Open `http://YOUR-IP:8000` — that's it. On first load the app auto-generates a login password and shows it on screen. All settings (SMB creds, scan schedule, SearXNG) can be updated at runtime via the Settings page.
 
-> **GPU acceleration:** The container uses CPU PyTorch by default. For GPU inference (NSFW detection, face detection), pass `--gpus all` and ensure `nvidia-container-toolkit` is installed on the host.
+> **GPU acceleration:** The container uses CPU PyTorch by default. For GPU inference (face detection), pass `--gpus all` and ensure `nvidia-container-toolkit` is installed on the host.
 
 **Unraid Community App:** Import the template from this repo or search "eyeris" on Unraid. The container uses SQLite by default (no separate database needed). Add a MariaDB host for multi-container setups.
 
@@ -55,7 +55,6 @@ NAS share
 
 - **Automatic NAS scanning** — Recursively discovers images across SMB/CIFS shares
 - **A-EYE tag ingestion** — Reads XMP sidecars written by A-EYE (descriptions, tags, albums)
-- **NSFW detection** — NudeNet ONNX model auto-detects and quarantines NSFW images on the NAS
 - **Face detection & grouping** — Detects faces with YOLOv8, extracts FaceNet embeddings, clusters into people
 - **Duplicate detection** — SHA-256 deduplication + perceptual hash visual similarity grouping
 - **EXIF & GPS metadata** — Date taken, camera model, GPS coordinates with reverse geocoding
@@ -79,10 +78,8 @@ The scanner (`backend/services/scanner_service.py`) runs as a persistent `asynci
 3. Deduplicate (keep higher-quality copy by file size + EXIF completeness)
 4. Extract EXIF, GPS, camera model; apply orientation correction
 5. Generate 300×300 JPEG thumbnail
-6. Run NSFW detection (NudeNet), face detection (YOLOv8) + FaceNet embedding extraction
+6. Run face detection (YOLOv8) + FaceNet embedding extraction
 7. Check for `.xmp` sidecar — if present, load description, tags, and album into DB
-
-NSFW images detected by NudeNet are automatically moved on the NAS into a `_detected_nsfw/` subfolder within the configured `NSFW_FOLDERS` share.
 
 ### Face Grouping
 
@@ -110,7 +107,7 @@ backend/
 │   └── searxng.py           # Web image search proxy + NAS download
 └── services/
     ├── scanner_service.py   # Scan pipeline and XMP ingestion
-    ├── gpu_models.py        # NudeNet + YOLOv8-face + FaceNet inference (GPU/CPU)
+    ├── gpu_models.py        # YOLOv8-face + FaceNet inference (GPU/CPU)
     ├── image_service.py     # EXIF, orientation, thumbnails, hashing
     ├── smb_service.py       # SMB/CIFS file I/O
     ├── llm_search.py        # Weighted keyword search
@@ -135,7 +132,7 @@ React + Vite + Tailwind SPA. All API calls go through `src/api.js` (Axios, `base
 - SMB/CIFS-accessible NAS storage
 - **[A-EYE](https://github.com/SpaceinvaderOne/a-eye)** — optional, provides AI tags/descriptions via XMP sidecars
 - **[SearXNG](https://github.com/searxng/searxng)** — optional, required for web image/video search
-- NVIDIA GPU recommended for NSFW detection and face detection (falls back to CPU)
+- NVIDIA GPU recommended for face detection (falls back to CPU)
 
 ### 1. Clone & configure
 
@@ -186,9 +183,6 @@ SMB_HOST=192.168.1.x
 SMB_USERNAME=your_nas_user
 SMB_PASSWORD=your_nas_password
 SMB_SHARES=photos,media         # comma-separated share names
-
-# NSFW handling (optional)
-NSFW_FOLDERS=photos             # shares where detected NSFW images get quarantined
 
 # Database — SQLite by default (Docker/Unraid)
 # Leave DB_HOST empty for built-in SQLite. Set to a MariaDB host for multi-container setups.
@@ -282,7 +276,6 @@ Full interactive docs at `http://localhost:8000/docs` (Swagger UI).
 | Backend | FastAPI, SQLAlchemy, Uvicorn |
 | Database | SQLite (default) or MariaDB/MySQL |
 | Frontend | React, Vite, Tailwind CSS, Axios |
-| NSFW detection | NudeNet (ONNX) |
 | Face detection | YOLOv8n-face + FaceNet (facenet-pytorch) |
 | AI tagging | [A-EYE](https://github.com/SpaceinvaderOne/a-eye) (external, via XMP sidecars) |
 | Storage | SMB/CIFS |
