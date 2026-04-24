@@ -1,0 +1,7 @@
+services:
+  eyeris:
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - render
+      - video

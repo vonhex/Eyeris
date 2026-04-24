@@ -14,13 +14,6 @@ services:
       - ./data/thumbnails:/data/thumbnails
       - ./data/db:/data/db
       - ./data/images:/data/images
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              capabilities: [gpu]
-              count: all
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
