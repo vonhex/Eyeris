@@ -159,8 +159,8 @@ function MainApp() {
 }
 
 function ProtectedRoute() {
-  const authenticated = isAuthenticated()
-  if (!authenticated) return <Login />
+  const [authenticated, setAuthenticated] = useState(isAuthenticated())
+  if (!authenticated) return <Login onLogin={() => setAuthenticated(true)} />
   return (
     <ErrorBoundary fallback={ErrorFallback}>
       <MainApp />

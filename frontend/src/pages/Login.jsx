@@ -2,12 +2,20 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { login } from "../api"
 
-export default function Login() {
+export default function Login({ onLogin }) {
   const navigate = useNavigate()
   const [authState, setAuthState] = useState("checking") // checking | login
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+
+  const goHome = () => {
+    if (onLogin) {
+      onLogin()
+    } else {
+      navigate("/", { replace: true })
+    }
+  }
 
   useEffect(() => {
     fetch("/auth/auto-setup", { method: "POST" })
@@ -22,9 +30,8 @@ export default function Login() {
           setAuthState("login")
           return
         }
-        // First-time setup: token auto-created, store and redirect
         localStorage.setItem("eyeris_auth_token", data.token)
-        navigate("/", { replace: true })
+        goHome()
       })
       .catch(() => {
         setAuthState("login")
@@ -38,7 +45,7 @@ export default function Login() {
     try {
       const data = await login(password)
       localStorage.setItem("eyeris_auth_token", data.token)
-      navigate("/", { replace: true })
+      goHome()
     } catch (err) {
       setError(err.response?.data?.detail || err.message || "Invalid password")
     } finally {
