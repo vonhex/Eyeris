@@ -33,10 +33,6 @@ Open `http://YOUR-IP:8000` — that's it. On first load the app auto-generates a
 
 > **GPU acceleration:** The container uses CPU PyTorch by default. For GPU inference (face detection), pass `--gpus all` and ensure `nvidia-container-toolkit` is installed on the host.
 
-**Unraid Community App:** Import the template from this repo or search "eyeris" on Unraid. The container uses SQLite by default (no separate database needed). Add a MariaDB host for multi-container setups.
-
-See [unraid/template.xml](unraid/template.xml) for full configuration options.
-
 ---
 
 ## How A-EYE fits in
