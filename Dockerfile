@@ -40,19 +40,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/*
 
-# Python deps — CPU PyTorch (auto-detects CUDA at runtime via nvidia-container-toolkit)
+# Python deps
 WORKDIR /app/backend
 COPY backend/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir \
-        torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu \
+RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir \
-        fastapi uvicorn[standard] sqlalchemy pymysql cryptography smbprotocol Pillow \
-        httpx python-dotenv python-multipart ultralytics facenet-pytorch \
-        scipy reverse_geocode watchfiles imagehash numpy opencv-python-headless \
-        transformers onnxruntime nvidia-cublas-cu12 nvidia-cudnn-cu12 \
-        bcrypt PyJWT \
-    && rm -rf /usr/local/lib/python3.12/site-packages/nvidia/nccl \
-           /usr/local/lib/python3.12/site-packages/cusparselt \
+        numpy opencv-python-headless transformers onnxruntime \
+        nvidia-cublas-cu12 nvidia-cudnn-cu12 nvidia-nccl-cu12 \
+    && rm -rf /usr/local/lib/python3.12/site-packages/cusparselt \
            /usr/local/lib/python3.12/site-packages/triton \
            /usr/local/lib/python3.12/site-packages/_polars_runtime_32 \
            /usr/local/lib/python3.12/site-packages/sympy \
