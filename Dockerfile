@@ -62,7 +62,8 @@ RUN mkdir -p /data/images /data/thumbnails /data/db \
     && chmod -R 777 /data
 
 ENV PYTHONUNBUFFERED=1 \
-    TZ=Etc/UTC
+    TZ=Etc/UTC \
+    THUMBNAIL_DIR=/data/thumbnails
 
 EXPOSE 8000
 

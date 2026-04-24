@@ -46,7 +46,7 @@ class Settings:
     SCAN_SCHEDULE_END: str = os.getenv("SCAN_SCHEDULE_END", "06:00")
 
     # Thumbnails
-    THUMBNAIL_DIR: str = os.getenv("THUMBNAIL_DIR", "/data/thumbnails")
+    THUMBNAIL_DIR: str = os.getenv("THUMBNAIL_DIR", os.path.join(os.path.dirname(__file__), "thumbnails"))
     THUMBNAIL_SIZE: tuple[int, int] = (300, 300)
 
     # Media Storage
