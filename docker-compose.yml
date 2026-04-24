@@ -1,0 +1,28 @@
+services:
+  eyeris:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: eyeris:dev
+    container_name: eyeris-dev
+    restart: on-failure
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data/thumbnails:/data/thumbnails
+      - ./data/db:/data/db
+      - ./data/images:/data/images
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              count: all
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

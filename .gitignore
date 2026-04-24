@@ -27,5 +27,8 @@ QWEN.md
 .gitignore
 .dockerignore
 
+# Local Docker dev data
+data/
+
 # Screenshots
 Screenshot*.png
