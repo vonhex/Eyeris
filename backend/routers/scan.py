@@ -122,11 +122,18 @@ def reset_database(db: Session = Depends(get_db)):
         else:
             db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
 
+        # Check once if sqlite_sequence exists (only present when AUTOINCREMENT is used)
+        has_seq = False
+        if is_sqlite:
+            has_seq = bool(db.execute(text(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'"
+            )).scalar())
+
         for tbl in ("faces", "image_tags", "image_categories", "images", "tags", "categories", "scan_jobs"):
             if is_sqlite:
                 db.execute(text(f"DELETE FROM {tbl}"))
-                # Safely reset sequence if sqlite_sequence table exists
-                db.execute(text(f"DELETE FROM sqlite_sequence WHERE name='{tbl}' AND EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='sqlite_sequence')"))
+                if has_seq:
+                    db.execute(text(f"DELETE FROM sqlite_sequence WHERE name='{tbl}'"))
             else:
                 db.execute(text(f"TRUNCATE TABLE {tbl}"))
 

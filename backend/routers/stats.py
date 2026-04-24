@@ -107,35 +107,68 @@ def _amd_gpu_stats(card: dict) -> dict:
     }
 
 
+def _intel_driver(card_path: str) -> str:
+    """Return 'xe', 'i915', or 'unknown' based on the driver symlink."""
+    try:
+        link = os.readlink(f"{card_path}/device/driver")
+        if "xe" in link.split("/")[-1]:
+            return "xe"
+        if "i915" in link.split("/")[-1]:
+            return "i915"
+    except Exception:
+        pass
+    return "unknown"
+
+
 def _intel_gpu_stats(card: dict) -> dict:
     cp = card["card_path"]
+    card_name = card["card"]
+    driver = _intel_driver(cp)
+
+    # --- Hwmon: xe names its hwmon "xe", i915 names it "i915" ---
     hwmon = card.get("hwmon", "")
-    
-    # --- Utilisation ---
-    # Try multiple common paths for Intel GPU utilization
-    util = (_read_sysfs(f"{cp}/device/gpu_busy_percent") or 
-            _read_sysfs(f"{cp}/device/usage") or
-            _read_sysfs(f"{cp}/device/busy"))
-
-    # --- Frequency ---
-    # Some kernels expose gt_cur_freq_mhz, others use different names or paths
-    freq = (_read_sysfs(f"{cp}/gt_cur_freq_mhz") or
-            _read_sysfs(f"{cp}/device/gt_cur_freq_mhz") or
-            _read_sysfs(f"{cp}/device/drm/{card['card']}/gt_cur_freq_mhz") or
-            _read_sysfs(f"{hwmon}/freq1_input", 1_000_000))
-
-    # --- VRAM (Discrete GPUs like Arc) ---
-    vram_used = (_read_sysfs(f"{cp}/device/lmem_used_bytes", 1024*1024) or
-                 _read_sysfs(f"{cp}/device/mem_info_vram_used", 1024*1024))
-    vram_total = (_read_sysfs(f"{cp}/device/lmem_total_bytes", 1024*1024) or
-                  _read_sysfs(f"{cp}/device/mem_info_vram_total", 1024*1024))
+    if not hwmon:
+        for drv_name in ("xe", "i915"):
+            h = _find_hwmon_by_name(drv_name)
+            if h:
+                hwmon = h
+                break
 
     # --- Temperature ---
     temp = _read_sysfs(f"{hwmon}/temp1_input", 1000) if hwmon else None
-    
+
+    # --- Frequency ---
+    if driver == "xe":
+        # xe driver: tile0/gt0/freq0/cur_freq (MHz directly)
+        freq = (_read_sysfs(f"{cp}/device/tile0/gt0/freq0/cur_freq") or
+                _read_sysfs(f"{hwmon}/freq1_input", 1_000_000) if hwmon else None)
+    else:
+        # i915 driver: gt_cur_freq_mhz directly on card path
+        freq = (_read_sysfs(f"{cp}/gt_cur_freq_mhz") or
+                _read_sysfs(f"{cp}/device/gt_cur_freq_mhz"))
+
+    # --- Utilisation ---
+    # xe: per-engine busyness files — average render+compute engines
+    util = None
+    if driver == "xe":
+        busyness_paths = glob.glob(f"{cp}/device/tile0/gt0/engines/*/busyness")
+        if not busyness_paths:
+            busyness_paths = glob.glob(f"{cp}/device/tile*/gt*/engines/*/busyness")
+        vals = [_read_sysfs(p) for p in busyness_paths if _read_sysfs(p) is not None]
+        if vals:
+            util = round(sum(vals) / len(vals), 1)
+    # i915 / fallback: no reliable sysfs util on iGPU — leave as None
+
+    # --- VRAM (Arc discrete has lmem, iGPU shares system RAM) ---
+    vram_used = (_read_sysfs(f"{cp}/device/tile0/lmem_used_bytes", 1024*1024) or
+                 _read_sysfs(f"{cp}/device/lmem_used_bytes", 1024*1024))
+    vram_total = (_read_sysfs(f"{cp}/device/tile0/lmem_total_bytes", 1024*1024) or
+                  _read_sysfs(f"{cp}/device/lmem_total_bytes", 1024*1024))
+
     return {
         "name":          card.get("name", "Intel GPU"),
         "vendor":        "intel",
+        "driver":        driver,
         "usage_pct":     util,
         "temp_c":        temp,
         "vram_used_mb":  _round(vram_used),

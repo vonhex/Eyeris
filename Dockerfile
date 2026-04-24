@@ -70,7 +70,9 @@ ENV PYTHONUNBUFFERED=1 \
     TZ=Etc/UTC \
     THUMBNAIL_DIR=/data/thumbnails \
     DB_PATH=/data/db/images.db \
-    MOUNT_BASE=/data/images
+    MOUNT_BASE=/data/images \
+    YOLO_CONFIG_DIR=/data/thumbnails/.yolo \
+    HF_HOME=/data/thumbnails/.hf_cache
 
 EXPOSE 8000
 
