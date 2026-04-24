@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom"
+import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from "react-router-dom"
 import { Component, useEffect, useState, Suspense } from "react"
 import Gallery from "./pages/Gallery"
 import ImageDetail from "./pages/ImageDetail"
@@ -121,6 +121,36 @@ function PhashStatusBar() {
   )
 }
 
+function AppNavLink({ to, label }) {
+  const location = useLocation()
+  const target = new URL(to, "http://x")
+  const samePath = location.pathname === target.pathname
+
+  let isActive
+  if (target.search) {
+    // Tab has query params (e.g. ?favorite=true) — must match exactly
+    isActive = samePath && location.search === target.search
+  } else if (target.pathname === "/") {
+    // Gallery root — only active when no special single-tab params are set
+    const sp = new URLSearchParams(location.search)
+    isActive = samePath && !sp.get("favorite") && !sp.get("untagged")
+  } else {
+    // Regular path-based tab
+    isActive = samePath
+  }
+
+  return (
+    <Link
+      to={to}
+      className={`px-3 py-1.5 rounded text-sm font-medium transition whitespace-nowrap ${
+        isActive ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
+      }`}
+    >
+      {label}
+    </Link>
+  )
+}
+
 function MainApp() {
   return (
     <div className="min-h-screen flex flex-col">
@@ -130,18 +160,7 @@ function MainApp() {
           <span className="text-xl font-bold text-white tracking-wide">eyeris</span>
         </div>
         {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end !== false}
-            className={({ isActive }) =>
-              `px-3 py-1.5 rounded text-sm font-medium transition whitespace-nowrap ${
-                isActive ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
-              }`
-            }
-          >
-            {item.label}
-          </NavLink>
+          <AppNavLink key={item.to} to={item.to} label={item.label} />
         ))}
         <div className="ml-auto shrink-0">
           <button
