@@ -247,6 +247,17 @@ def process_image_bytes(data: bytes) -> dict:
     camera_model = extract_camera_model(original)
 
     location_name = None
+    if gps_lat is not None and gps_lon is not None:
+        try:
+            import reverse_geocode
+            result = reverse_geocode.search([(gps_lat, gps_lon)])
+            if result:
+                city = result[0].get("city", "")
+                country = result[0].get("country", "")
+                location_name = ", ".join(filter(None, [city, country]))
+        except Exception as e:
+            print(f"[Geocode] Failed for ({gps_lat}, {gps_lon}): {e}")
+
     quality_flags = json.dumps({"blur": False, "blur_score": 0.0, "overexposed": False, "underexposed": False})
 
     width, height = img.size

@@ -116,6 +116,44 @@ async def lifespan(app_instance: FastAPI):
                 print("[Startup] Added images.quality_flags")
     except Exception as e:
         print(f"[Startup] Image migration: {e}")
+
+    # Backfill location_name for images that have GPS coords but no location yet
+    try:
+        import asyncio as _asyncio
+        from database import SessionLocal as _SessionLocal
+        from models import Image as _Image
+        import reverse_geocode as _rg
+
+        async def _backfill_locations():
+            db = _SessionLocal()
+            try:
+                rows = (
+                    db.query(_Image.id, _Image.gps_lat, _Image.gps_lon)
+                    .filter(_Image.gps_lat.isnot(None), _Image.location_name.is_(None))
+                    .all()
+                )
+                if not rows:
+                    return
+                print(f"[Startup] Backfilling location names for {len(rows)} images…")
+                coords = [(r.gps_lat, r.gps_lon) for r in rows]
+                results = _rg.search(coords)
+                for row, geo in zip(rows, results):
+                    city = geo.get("city", "")
+                    country = geo.get("country", "")
+                    name = ", ".join(filter(None, [city, country]))
+                    if name:
+                        db.query(_Image).filter(_Image.id == row.id).update({"location_name": name})
+                db.commit()
+                print(f"[Startup] Location backfill complete.")
+            except Exception as e:
+                print(f"[Startup] Location backfill error: {e}")
+            finally:
+                db.close()
+
+        _asyncio.create_task(_backfill_locations())
+    except Exception as e:
+        print(f"[Startup] Location backfill setup error: {e}")
+
     await start_background_scanner()
     print("[Startup] Background scanner started")
     await start_watcher()
