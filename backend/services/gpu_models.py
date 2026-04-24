@@ -25,16 +25,15 @@ def _load_yolo_face():
         return _yolo_face_model
     try:
         from ultralytics import YOLO
-        # Try local path first, then fall back to name for auto-download
-        model_name = "yolov8n-face.pt"
-        local_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), model_name)
+        from huggingface_hub import hf_hub_download
         
-        if os.path.exists(local_path):
-            _yolo_face_model = YOLO(local_path)
-        else:
-            print(f"[GPU Models] Local {model_name} not found, attempting auto-download...")
-            _yolo_face_model = YOLO(model_name)
-            
+        model_name = "yolov8n-face.pt"
+        repo_id = "vonhex/yolo-v8"
+        
+        print(f"[GPU Models] Ensuring {model_name} is available (from Hugging Face {repo_id})...")
+        model_path = hf_hub_download(repo_id=repo_id, filename=model_name)
+        
+        _yolo_face_model = YOLO(model_path)
         _yolo_face_model.to(DEVICE)
         return _yolo_face_model
     except Exception as e:

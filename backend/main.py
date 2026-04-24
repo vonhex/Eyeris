@@ -197,7 +197,7 @@ async def lifespan(app_instance: FastAPI):
 app = FastAPI(
     title="Image Catalog",
     description="AI-powered image categorization from NAS storage",
-    version="1.1.12",
+    version="1.1.13",
     lifespan=lifespan,
 )
 
