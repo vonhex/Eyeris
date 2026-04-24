@@ -4,7 +4,10 @@
 
 > Self-hosted photo manager with AI tag ingestion. Your Pictures. Fast. Easy. Simple.
 
-Eyeris is a full-stack, self-hosted image management platform for large personal or home-lab photo libraries stored on NAS/SMB storage. It handles discovery, deduplication, metadata extraction, face grouping, and browsing. AI analysis (descriptions, tags, categories, sentiment) is provided by **A-EYE**, a separate tool you run yourself that writes XMP sidecar files back to the NAS. Eyeris picks those up automatically during each scan.
+> [!WARNING]
+> **Eyeris is designed for use on a trusted local network only.** It has no brute-force protection on the login endpoint, no multi-user access control, and image URLs embed session tokens that appear in server logs. Do not expose it directly to the internet. If you need remote access, use a VPN or put it behind Cloudflare Access — not a plain public tunnel.
+
+Eyeris is a full-stack, self-hosted image management platform for large personal or home-lab photo libraries stored on NAS/SMB storage. It handles discovery, deduplication, metadata extraction, face grouping, and browsing. AI analysis (descriptions, tags, categories, albums, sentiment) is provided by **A-EYE**, a separate tool you run yourself that writes XMP sidecar files back to the NAS. Eyeris picks those up automatically during each scan. Built-in GPU models handle NSFW detection and face detection/clustering independently of A-EYE.
 
 ---
 
@@ -17,7 +20,6 @@ docker pull ghcr.io/vonhex/eyeris:latest
 docker run -d \
   --name eyeris \
   -p 8000:8000 \
-  -v /mnt/user/Pictures:/data/images \
   -v /mnt/user/appdata/eyeris/thumbnails:/data/thumbnails \
   -v /mnt/user/appdata/eyeris/db:/data/db \
   -e SMB_HOST=192.168.1.x \
@@ -27,7 +29,9 @@ docker run -d \
   ghcr.io/vonhex/eyeris:latest
 ```
 
-Open `http://YOUR-IP:8000` — that's it. All settings (SMB creds, scan concurrency, SearXNG) are available in the Settings page at runtime.
+Open `http://YOUR-IP:8000` — that's it. On first load the app auto-generates a login password and shows it on screen. All settings (SMB creds, scan schedule, SearXNG) can be updated at runtime via the Settings page.
+
+> **GPU acceleration:** The container uses CPU PyTorch by default. For GPU inference (NSFW detection, face detection), pass `--gpus all` and ensure `nvidia-container-toolkit` is installed on the host.
 
 **Unraid Community App:** Import the template from this repo or search "eyeris" on Unraid. The container uses SQLite by default (no separate database needed). Add a MariaDB host for multi-container setups.
 
@@ -51,6 +55,7 @@ NAS share
 
 - **Automatic NAS scanning** — Recursively discovers images across SMB/CIFS shares
 - **A-EYE tag ingestion** — Reads XMP sidecars written by A-EYE (descriptions, tags, albums)
+- **NSFW detection** — NudeNet ONNX model auto-detects and quarantines NSFW images on the NAS
 - **Face detection & grouping** — Detects faces with YOLOv8, extracts FaceNet embeddings, clusters into people
 - **Duplicate detection** — SHA-256 deduplication + perceptual hash visual similarity grouping
 - **EXIF & GPS metadata** — Date taken, camera model, GPS coordinates with reverse geocoding
@@ -58,6 +63,7 @@ NAS share
 - **Real-time file watching** — Detects new images on the NAS immediately
 - **Hardware monitoring** — Live CPU, GPU (NVIDIA, AMD, Intel), and RAM stats — auto-detected, no hardcoded paths
 - **Web search** — Search images and videos via SearXNG with direct-to-NAS download
+- **Password-protected** — JWT auth with auto-generated default password on first run
 
 ---
 
@@ -73,8 +79,10 @@ The scanner (`backend/services/scanner_service.py`) runs as a persistent `asynci
 3. Deduplicate (keep higher-quality copy by file size + EXIF completeness)
 4. Extract EXIF, GPS, camera model; apply orientation correction
 5. Generate 300×300 JPEG thumbnail
-6. Run face detection (YOLOv8) + FaceNet embedding extraction
+6. Run NSFW detection (NudeNet), face detection (YOLOv8) + FaceNet embedding extraction
 7. Check for `.xmp` sidecar — if present, load description, tags, and album into DB
+
+NSFW images detected by NudeNet are automatically moved on the NAS into a `_detected_nsfw/` subfolder within the configured `NSFW_FOLDERS` share.
 
 ### Face Grouping
 
@@ -90,6 +98,7 @@ backend/
 ├── schemas.py               # Pydantic request/response schemas
 ├── database.py              # DB session factory
 ├── routers/
+│   ├── auth.py              # Login, auto-setup, change password (JWT)
 │   ├── images.py            # Image CRUD, search, bulk ops, favorites
 │   ├── tags.py              # Tag listing with counts
 │   ├── categories.py        # Category listing with counts
@@ -101,7 +110,7 @@ backend/
 │   └── searxng.py           # Web image search proxy + NAS download
 └── services/
     ├── scanner_service.py   # Scan pipeline and XMP ingestion
-    ├── gpu_models.py        # YOLOv8-face + FaceNet inference (GPU/CPU)
+    ├── gpu_models.py        # NudeNet + YOLOv8-face + FaceNet inference (GPU/CPU)
     ├── image_service.py     # EXIF, orientation, thumbnails, hashing
     ├── smb_service.py       # SMB/CIFS file I/O
     ├── llm_search.py        # Weighted keyword search
@@ -113,7 +122,7 @@ backend/
 
 React + Vite + Tailwind SPA. All API calls go through `src/api.js` (Axios, `baseURL: "/api"`).
 
-**Pages:** Gallery, Image Detail, Albums, People, Tags, Folders, Duplicates, Image Search, Scan History, Dashboard, Settings
+**Pages:** Gallery, Image Detail, People, Tags, Folders, Duplicates, Image Search, Dashboard, Settings
 
 ---
 
@@ -126,6 +135,7 @@ React + Vite + Tailwind SPA. All API calls go through `src/api.js` (Axios, `base
 - SMB/CIFS-accessible NAS storage
 - **[A-EYE](https://github.com/SpaceinvaderOne/a-eye)** — optional, provides AI tags/descriptions via XMP sidecars
 - **[SearXNG](https://github.com/searxng/searxng)** — optional, required for web image/video search
+- NVIDIA GPU recommended for NSFW detection and face detection (falls back to CPU)
 
 ### 1. Clone & configure
 
@@ -136,24 +146,15 @@ cp .env.example .env
 # Edit .env with your values (see below)
 ```
 
-### 2. Mount NAS shares
+### 2. Backend
 
 ```bash
-sudo bash mount-nas.sh
-# Mounts shares to /mnt/nas/<share_name>/
-# Adds persistent entries to /etc/fstab
+python -m venv venv
+source venv/bin/activate
+pip install -r backend/requirements.txt
 ```
 
-### 3. Backend
-
-```bash
-cd backend
-python -m venv ../venv
-source ../venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 4. Frontend
+### 3. Frontend
 
 ```bash
 cd frontend
@@ -161,7 +162,7 @@ npm install
 npm run build      # production build → frontend/dist/
 ```
 
-### 5. Run
+### 4. Run
 
 ```bash
 # Development (backend + frontend dev server)
@@ -186,8 +187,11 @@ SMB_USERNAME=your_nas_user
 SMB_PASSWORD=your_nas_password
 SMB_SHARES=photos,media         # comma-separated share names
 
+# NSFW handling (optional)
+NSFW_FOLDERS=photos             # shares where detected NSFW images get quarantined
+
 # Database — SQLite by default (Docker/Unraid)
-# Leave DB_HOST empty for SQLite. Set to a MariaDB host for multi-container setups.
+# Leave DB_HOST empty for built-in SQLite. Set to a MariaDB host for multi-container setups.
 DB_HOST=                        # e.g. 10.0.1.106 or leave empty
 DB_PORT=3306
 DB_USER=root
@@ -206,6 +210,10 @@ SCAN_SCHEDULE_END=06:00
 # SearXNG web search (optional)
 SEARXNG_URL=http://localhost:8887
 
+# Authentication — auto-generated on first run, do not edit manually
+# EYERIS_SECRET_KEY=
+# EYERIS_PASSWORD_HASH=
+
 # Thumbnails (internal path)
 THUMBNAIL_DIR=backend/thumbnails
 ```
@@ -214,10 +222,22 @@ Settings can also be updated at runtime via `PUT /api/settings` (persisted back 
 
 ---
 
+## Authentication
+
+On first run, Eyeris auto-generates a login with the default password **`eyeris`**. Change it immediately via **Settings → Change Password**. There is no multi-user support — one password controls all access.
+
+Auth tokens are 30-day JWTs stored in the browser. If your token is compromised, change your password (this invalidates all existing tokens).
+
+---
+
 ## API Reference
+
+All API endpoints (except `/auth/*`) require a `Bearer` token in the `Authorization` header.
 
 | Method | Path | Description |
 |---|---|---|
+| `POST` | `/auth/login` | Login with password, returns JWT |
+| `PUT` | `/auth/change-password` | Change password |
 | `GET` | `/api/images` | List images (pagination, filters, sort, search) |
 | `GET` | `/api/images/{id}` | Image detail with tags, faces, metadata |
 | `GET` | `/api/images/{id}/thumbnail` | Thumbnail JPEG |
@@ -262,6 +282,7 @@ Full interactive docs at `http://localhost:8000/docs` (Swagger UI).
 | Backend | FastAPI, SQLAlchemy, Uvicorn |
 | Database | SQLite (default) or MariaDB/MySQL |
 | Frontend | React, Vite, Tailwind CSS, Axios |
+| NSFW detection | NudeNet (ONNX) |
 | Face detection | YOLOv8n-face + FaceNet (facenet-pytorch) |
 | AI tagging | [A-EYE](https://github.com/SpaceinvaderOne/a-eye) (external, via XMP sidecars) |
 | Storage | SMB/CIFS |
