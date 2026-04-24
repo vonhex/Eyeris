@@ -1,0 +1,17 @@
+venv/
+venv-314-backup/
+frontend/node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.env
+backend/thumbnails/
+thumbnails/
+*.db
+*.sqlite
+*.pid
+docs/
+.git/
+*.mp4
+*.tar.gz
+*.zip

@@ -45,11 +45,17 @@ WORKDIR /app/backend
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir \
-        numpy opencv-python-headless transformers onnxruntime \
-        nvidia-cublas-cu12 nvidia-cudnn-cu12 nvidia-nccl-cu12 \
-    && rm -rf /usr/local/lib/python3.12/site-packages/cusparselt \
+        numpy opencv-python-headless \
+        nvidia-cublas-cu12 nvidia-cudnn-cu12 \
+    && pip uninstall -y nvidia-nccl-cu12 2>/dev/null || true \
+    && rm -rf \
+           /usr/local/lib/python3.12/site-packages/cusparselt \
            /usr/local/lib/python3.12/site-packages/triton \
            /usr/local/lib/python3.12/site-packages/_polars_runtime_32 \
+           /usr/local/lib/python3.12/site-packages/torch/include \
+           /usr/local/lib/python3.12/site-packages/torch/test \
+           /usr/local/lib/python3.12/site-packages/torch/share/doc \
+           /usr/local/lib/python3.12/site-packages/torch/utils/benchmark \
     && find /usr/local/lib/python3.12/site-packages/ -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
 # Backend source + pre-built frontend
