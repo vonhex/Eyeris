@@ -276,10 +276,13 @@ def process_video_file(path: str) -> dict:
     thumb_path = os.path.join(settings.THUMBNAIL_DIR, thumb_filename)
     try:
         # Seek to 1s or middle to get a good frame
-        subprocess.run([
+        res = subprocess.run([
             "ffmpeg", "-ss", "00:00:01", "-i", path,
-            "-frames:v", "1", "-q:v", "2", thumb_path, "-y", "-loglevel", "quiet"
-        ], check=True)
+            "-frames:v", "1", "-q:v", "2", thumb_path, "-y"
+        ], capture_output=True, text=True)
+        if res.returncode != 0:
+            print(f"[Video] Thumb error for {path}: ffmpeg returned {res.returncode}")
+            print(f"[Video] stderr: {res.stderr}")
     except Exception as e:
         print(f"[Video] Thumb error for {path}: {e}")
         # Placeholder? Or just fail
