@@ -110,19 +110,36 @@ def _amd_gpu_stats(card: dict) -> dict:
 def _intel_gpu_stats(card: dict) -> dict:
     cp = card["card_path"]
     hwmon = card.get("hwmon", "")
-    # Utilisation: some kernels expose gpu_busy_percent for i915 too
-    util = _read_sysfs(f"{cp}/device/gpu_busy_percent")
-    # Frequency: gt_cur_freq_mhz lives directly on the card sysfs dir on most systems
+    
+    # --- Utilisation ---
+    # Try multiple common paths for Intel GPU utilization
+    util = (_read_sysfs(f"{cp}/device/gpu_busy_percent") or 
+            _read_sysfs(f"{cp}/device/usage") or
+            _read_sysfs(f"{cp}/device/busy"))
+
+    # --- Frequency ---
+    # Some kernels expose gt_cur_freq_mhz, others use different names or paths
     freq = (_read_sysfs(f"{cp}/gt_cur_freq_mhz") or
-            _read_sysfs(f"{cp}/device/gt_cur_freq_mhz"))
+            _read_sysfs(f"{cp}/device/gt_cur_freq_mhz") or
+            _read_sysfs(f"{cp}/device/drm/{card['card']}/gt_cur_freq_mhz") or
+            _read_sysfs(f"{hwmon}/freq1_input", 1_000_000))
+
+    # --- VRAM (Discrete GPUs like Arc) ---
+    vram_used = (_read_sysfs(f"{cp}/device/lmem_used_bytes", 1024*1024) or
+                 _read_sysfs(f"{cp}/device/mem_info_vram_used", 1024*1024))
+    vram_total = (_read_sysfs(f"{cp}/device/lmem_total_bytes", 1024*1024) or
+                  _read_sysfs(f"{cp}/device/mem_info_vram_total", 1024*1024))
+
+    # --- Temperature ---
     temp = _read_sysfs(f"{hwmon}/temp1_input", 1000) if hwmon else None
+    
     return {
         "name":          card.get("name", "Intel GPU"),
         "vendor":        "intel",
         "usage_pct":     util,
         "temp_c":        temp,
-        "vram_used_mb":  None,
-        "vram_total_mb": None,
+        "vram_used_mb":  _round(vram_used),
+        "vram_total_mb": _round(vram_total),
         "freq_mhz":      _round(freq),
         "mem_usage_pct": None,
     }

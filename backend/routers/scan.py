@@ -125,7 +125,8 @@ def reset_database(db: Session = Depends(get_db)):
         for tbl in ("faces", "image_tags", "image_categories", "images", "tags", "categories", "scan_jobs"):
             if is_sqlite:
                 db.execute(text(f"DELETE FROM {tbl}"))
-                db.execute(text(f"DELETE FROM sqlite_sequence WHERE name='{tbl}'"))
+                # Safely reset sequence if sqlite_sequence table exists
+                db.execute(text(f"DELETE FROM sqlite_sequence WHERE name='{tbl}' AND EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='sqlite_sequence')"))
             else:
                 db.execute(text(f"TRUNCATE TABLE {tbl}"))
 

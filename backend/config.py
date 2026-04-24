@@ -19,6 +19,13 @@ class Settings:
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
     DB_NAME: str = os.getenv("DB_NAME", "image_catalog")
 
+    # --- Path Configuration (Universal) ---
+    # Default to relative paths for host-based installs (Unraid/Linux)
+    # Docker overrides these via ENV variables in the Dockerfile.
+    @property
+    def REPO_ROOT(self) -> str:
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
     @property
     def DATABASE_URL(self) -> str:
         if self.DB_HOST:
@@ -27,9 +34,19 @@ class Settings:
                 f"mysql+pymysql://{quote_plus(self.DB_USER)}:{quote_plus(self.DB_PASSWORD)}"
                 f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
             )
-        # SQLite — default for Docker/Unraid deployments
-        db_path = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "images.db"))
+        # SQLite — default for host-based or simple Docker setups
+        default_db = os.path.join(self.REPO_ROOT, "db", "images.db")
+        db_path = os.getenv("DB_PATH", default_db)
+        # Ensure parent dir exists for SQLite
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
         return f"sqlite:///{db_path}"
+
+    # Thumbnails
+    THUMBNAIL_DIR: str = os.getenv("THUMBNAIL_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "thumbnails"))
+    THUMBNAIL_SIZE: tuple[int, int] = (300, 300)
+
+    # Media Storage (where NAS shares are mounted or local photos reside)
+    MOUNT_BASE: str = os.getenv("MOUNT_BASE", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images"))
 
     # SearXNG integration
     SEARXNG_URL: str = os.getenv("SEARXNG_URL", "")
@@ -44,13 +61,6 @@ class Settings:
     SCAN_SCHEDULE_ENABLED: bool = os.getenv("SCAN_SCHEDULE_ENABLED", "false").lower() == "true"
     SCAN_SCHEDULE_START: str = os.getenv("SCAN_SCHEDULE_START", "22:00")
     SCAN_SCHEDULE_END: str = os.getenv("SCAN_SCHEDULE_END", "06:00")
-
-    # Thumbnails
-    THUMBNAIL_DIR: str = os.getenv("THUMBNAIL_DIR", os.path.join(os.path.dirname(__file__), "thumbnails"))
-    THUMBNAIL_SIZE: tuple[int, int] = (300, 300)
-
-    # Media Storage
-    MOUNT_BASE: str = os.getenv("MOUNT_BASE", "/data/images")
 
     # Authentication
     @property

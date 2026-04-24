@@ -63,7 +63,8 @@ RUN mkdir -p /data/images /data/thumbnails /data/db \
 ENV PYTHONUNBUFFERED=1 \
     TZ=Etc/UTC \
     THUMBNAIL_DIR=/data/thumbnails \
-    DB_PATH=/data/db/images.db
+    DB_PATH=/data/db/images.db \
+    MOUNT_BASE=/data/images
 
 EXPOSE 8000
 

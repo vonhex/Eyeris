@@ -281,18 +281,25 @@ def process_video_file(path: str) -> dict:
     os.makedirs(settings.THUMBNAIL_DIR, exist_ok=True)
     thumb_filename = f"{uuid.uuid4().hex}.jpg"
     thumb_path = os.path.join(settings.THUMBNAIL_DIR, thumb_filename)
-    try:
-        # Seek to 1s or middle to get a good frame. -an avoids audio processing.
-        res = subprocess.run([
-            "ffmpeg", "-ss", "00:00:01", "-i", path,
-            "-vframes", "1", "-an", "-q:v", "2", thumb_path, "-y"
-        ], capture_output=True, text=True)
-        if res.returncode != 0:
-            print(f"[Video] Thumb error for {path}: ffmpeg returned {res.returncode}")
-            print(f"[Video] stderr: {res.stderr}")
-    except Exception as e:
-        print(f"[Video] Thumb error for {path}: {e}")
-        # Placeholder? Or just fail
+    
+    # Try seeking to 1s first (often avoids black frames at start)
+    # If it fails or video is too short, fall back to 0s
+    success = False
+    for seek_time in ["00:00:01", "00:00:00"]:
+        try:
+            res = subprocess.run([
+                "ffmpeg", "-ss", seek_time, "-i", path,
+                "-vframes", "1", "-an", "-q:v", "2", thumb_path, "-y"
+            ], capture_output=True, text=True)
+            
+            if res.returncode == 0 and os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
+                success = True
+                break
+        except Exception:
+            continue
+            
+    if not success:
+        print(f"[Video] Thumb generation failed for {path} after multiple attempts")
     
     return {
         "file_hash": file_hash,

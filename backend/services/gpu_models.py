@@ -27,11 +27,11 @@ def _load_yolo_face():
         from ultralytics import YOLO
         from huggingface_hub import hf_hub_download
         
-        model_name = "yolov8n-face.pt"
         repo_id = "arnabdhar/YOLOv8-Face-Detection"
+        model_filename = "model.pt"
         
-        print(f"[GPU Models] Ensuring {model_name} is available (from Hugging Face {repo_id})...")
-        model_path = hf_hub_download(repo_id=repo_id, filename=model_name)
+        print(f"[GPU Models] Ensuring YOLOv8-face is available (from Hugging Face {repo_id})...")
+        model_path = hf_hub_download(repo_id=repo_id, filename=model_filename)
         
         _yolo_face_model = YOLO(model_path)
         _yolo_face_model.to(DEVICE)
