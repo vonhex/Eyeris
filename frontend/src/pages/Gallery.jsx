@@ -125,6 +125,7 @@ export default function Gallery() {
         if (camera) params.camera = camera
         if (quality_issue) params.quality_issue = quality_issue
         if (has_gps !== null) params.has_gps = has_gps
+        if (untagged) params.untagged = true
 
         const data = await getImages(params)
         if (id !== fetchRef.current) return
@@ -225,6 +226,7 @@ export default function Gallery() {
     if (favorite) params.favorite = true
     if (date_from) params.date_from = date_from
     if (date_to) params.date_to = date_to
+    if (untagged) params.untagged = true
 
     const data = await getImageIds(params)
     setSelected(new Set(data.ids))
