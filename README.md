@@ -19,7 +19,7 @@
 
 | Who it's for | Method | Guide |
 |---|---|---|
-| **Unraid users** | Community Apps — one-click install, no files needed | [Unraid →](https://github.com/vonhex/Eyeris/wiki/Installation#path-1-unraid) |
+| **Unraid users** | Manual install via template — see the wiki | [Unraid →](https://github.com/vonhex/Eyeris/wiki/Installation#path-1-unraid) |
 | **Everyone else** (Linux / Windows / macOS with Docker) | Run `./docker-start.sh` — auto-detects your GPU | [Docker →](https://github.com/vonhex/Eyeris/wiki/Installation#path-2-docker) |
 | **Developers** | Run `./start.sh` — Python + Node directly, no Docker | [Dev →](https://github.com/vonhex/Eyeris/wiki/Installation#path-3-developer--manual) |
 
