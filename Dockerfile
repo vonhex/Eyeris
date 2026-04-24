@@ -57,6 +57,10 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY backend/ ./
 COPY --from=frontend-build /build/dist /app/frontend/dist
 
+# Create data directories and ensure they are writable
+RUN mkdir -p /data/images /data/thumbnails /data/db \
+    && chmod -R 777 /data
+
 ENV PYTHONUNBUFFERED=1 \
     TZ=Etc/UTC
 
