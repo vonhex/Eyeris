@@ -28,7 +28,7 @@ class Settings:
                 f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
             )
         # SQLite — default for Docker/Unraid deployments
-        db_path = os.path.join("/data/db", "images.db")
+        db_path = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "images.db"))
         return f"sqlite:///{db_path}"
 
     # SearXNG integration

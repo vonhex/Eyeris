@@ -325,7 +325,7 @@ async def _discover_image(db: Session, img_info: dict):
         except asyncio.TimeoutError:
             print(f"[Scanner] Timeout reading {file_path} — skipping")
             return
-        file_hash = await asyncio.to_thread(compute_hash, data)
+        file_hash = await asyncio.to_thread(compute_hash, data=data)
 
     file_size = img_info.get("file_size") or (len(data) if data else 0)
 

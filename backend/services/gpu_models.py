@@ -28,7 +28,7 @@ def _load_yolo_face():
         from huggingface_hub import hf_hub_download
         
         model_name = "yolov8n-face.pt"
-        repo_id = "vonhex/yolo-v8"
+        repo_id = "arnabdhar/YOLOv8-Face-Detection"
         
         print(f"[GPU Models] Ensuring {model_name} is available (from Hugging Face {repo_id})...")
         model_path = hf_hub_download(repo_id=repo_id, filename=model_name)

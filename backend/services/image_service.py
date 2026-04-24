@@ -18,8 +18,15 @@ for tag, name in ExifTags.TAGS.items():
         break
 
 
-def compute_hash(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+def compute_hash(data: bytes | None = None, file_path: str | None = None) -> str:
+    sha256 = hashlib.sha256()
+    if file_path:
+        with open(file_path, "rb") as f:
+            while chunk := f.read(8192):
+                sha256.update(chunk)
+    elif data:
+        sha256.update(data)
+    return sha256.hexdigest()
 
 
 def correct_orientation(img: Image.Image) -> tuple[Image.Image, bool]:
@@ -240,9 +247,7 @@ def is_video(filename: str) -> bool:
 
 def process_video_file(path: str) -> dict:
     """Extract video metadata and generate a thumbnail from the middle of the video."""
-    file_hash = ""
-    with open(path, "rb") as f:
-        file_hash = compute_hash(f.read())
+    file_hash = compute_hash(file_path=path)
 
     # Get metadata
     width, height = 0, 0
@@ -277,10 +282,10 @@ def process_video_file(path: str) -> dict:
     thumb_filename = f"{uuid.uuid4().hex}.jpg"
     thumb_path = os.path.join(settings.THUMBNAIL_DIR, thumb_filename)
     try:
-        # Seek to 1s or middle to get a good frame
+        # Seek to 1s or middle to get a good frame. -an avoids audio processing.
         res = subprocess.run([
             "ffmpeg", "-ss", "00:00:01", "-i", path,
-            "-frames:v", "1", "-q:v", "2", thumb_path, "-y"
+            "-vframes", "1", "-an", "-q:v", "2", thumb_path, "-y"
         ], capture_output=True, text=True)
         if res.returncode != 0:
             print(f"[Video] Thumb error for {path}: ffmpeg returned {res.returncode}")
@@ -304,7 +309,7 @@ def process_image_bytes(data: bytes) -> dict:
     Process raw image bytes: correct orientation, generate thumbnail, extract metadata.
     Returns a dict with all extracted info.
     """
-    file_hash = compute_hash(data)
+    file_hash = compute_hash(data=data)
 
     img = Image.open(BytesIO(data))
     img, orientation_corrected = correct_orientation(img)
