@@ -28,9 +28,10 @@ export default function Gallery() {
   const camera = searchParams.get("camera") || null
   const quality_issue = searchParams.get("quality_issue") || null
   const has_gps = searchParams.get("has_gps") === "true" ? true : null
+  const untagged = searchParams.get("untagged") === "true" ? true : null
 
-  const filters = { folder, tag, category, search, cluster_id, favorite, date_from, date_to, location, camera, quality_issue, has_gps }
-  const filtersKey = JSON.stringify({ folder, tag, category, search, sort, cluster_id, favorite, date_from, date_to, location, camera, quality_issue, has_gps })
+  const filters = { folder, tag, category, search, cluster_id, favorite, date_from, date_to, location, camera, quality_issue, has_gps, untagged }
+  const filtersKey = JSON.stringify({ folder, tag, category, search, sort, cluster_id, favorite, date_from, date_to, location, camera, quality_issue, has_gps, untagged })
 
   const [images, setImages] = useState([])
   const [total, setTotal] = useState(0)

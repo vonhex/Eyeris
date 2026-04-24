@@ -15,6 +15,7 @@ import Login from "./pages/Login"
 const navItems = [
   { to: "/", label: "Gallery", end: true },
   { to: "/?favorite=true", label: "Favorites", end: false, exact: false },
+  { to: "/?untagged=true", label: "Untagged", end: false },
   { to: "/people", label: "People" },
   { to: "/tags", label: "Tags" },
   { to: "/folders", label: "Folders" },

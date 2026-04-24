@@ -70,6 +70,7 @@ def list_images(
     camera: str | None = None,
     quality_issue: str | None = None,  # "blur" | "overexposed" | "underexposed" | "any"
     has_gps: bool | None = None,
+    untagged: bool | None = None,
     sort: str | None = Query(None, pattern="^(date_taken|date_added|filename)_(asc|desc)$|^random$"),
     db: Session = Depends(get_db),
 ):
@@ -157,6 +158,8 @@ def list_images(
             id_query = id_query.filter(
                 Image.quality_flags.ilike(f'%"{quality_issue}": true%')
             )
+    if untagged:
+        id_query = id_query.filter(~Image.tags.any())
 
     total = id_query.distinct().count()
 
@@ -229,6 +232,7 @@ def list_image_ids(
     favorite: bool | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
+    untagged: bool | None = None,
     db: Session = Depends(get_db),
 ):
     """Return all image IDs matching the current filters (no pagination). Used for Select All."""
@@ -257,6 +261,8 @@ def list_image_ids(
     if cluster_id is not None:
         person_img_ids = db.query(Face.image_id).filter(Face.cluster_id == cluster_id).subquery()
         q = q.filter(Image.id.in_(db.query(person_img_ids.c.image_id)))
+    if untagged:
+        q = q.filter(~Image.tags.any())
     ids = [row[0] for row in q.distinct().all()]
     return {"ids": ids}
 
