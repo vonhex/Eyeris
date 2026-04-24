@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/vonhex/Eyeris/releases/latest"><img src="https://img.shields.io/github/v/release/vonhex/Eyeris?style=flat-square" alt="Latest Release"></a>
   <a href="https://github.com/vonhex/Eyeris/pkgs/container/eyeris"><img src="https://img.shields.io/badge/Docker-ghcr.io-blue?style=flat-square&logo=docker" alt="Docker"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Noncommercial-orange?style=flat-square" alt="License"></a>
 </p>
 
 > Self-hosted photo manager with AI tag ingestion. Your Pictures. Fast. Easy. Simple.
@@ -346,4 +346,4 @@ Full interactive docs: `http://localhost:8000/docs`
 
 ## License
 
-MIT
+[PolyForm Noncommercial License 1.0.0](LICENSE) — free to use and modify, not for commercial use or resale. For commercial licensing contact necropsyk@gmail.com.
