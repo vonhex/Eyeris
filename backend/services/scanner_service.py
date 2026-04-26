@@ -614,6 +614,58 @@ async def run_full_resync() -> int:
         db.close()
 
 
+async def run_xmp_resync() -> int:
+    """Re-read XMP sidecars for all images that currently have no tags."""
+    global _current_job_id, _stop_requested
+    db = SessionLocal()
+    try:
+        job = ScanJob(status="running", started_at=datetime.utcnow())
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        _current_job_id = job.id
+
+        images = db.query(Image).filter(~Image.tags.any()).all()
+        total = len(images)
+        job.phase1_total = total
+        job.total_images = total
+        db.commit()
+
+        print(f"[XMP Resync] Re-reading XMP sidecars for {total} untagged images...")
+        done = 0
+        for img_record in images:
+            if _stop_requested:
+                break
+            try:
+                await _load_xmp_for_image(db, img_record)
+            except Exception as e:
+                print(f"[XMP Resync] Error for {img_record.file_path}: {e}")
+
+            done += 1
+            job.phase1_done = done
+            if done % 100 == 0 or done == total:
+                db.commit()
+                print(f"[XMP Resync] Progress: {done}/{total}")
+
+        job.status = "stopped" if _stop_requested else "completed"
+        job.completed_at = datetime.utcnow()
+        db.commit()
+        print(f"[XMP Resync] Complete: {done}/{total} images processed.")
+        return job.id
+    except Exception as e:
+        if 'job' in locals():
+            job.status = "failed"
+            job.error_message = str(e)
+            job.completed_at = datetime.utcnow()
+            db.commit()
+        print(f"[XMP Resync] Failed: {e}")
+        raise
+    finally:
+        _stop_requested = False
+        _current_job_id = None
+        db.close()
+
+
 async def run_phash_scan():
     """Compute perceptual hashes for all images that don't have one yet."""
     global _current_job_id, _stop_requested

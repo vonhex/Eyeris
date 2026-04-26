@@ -118,6 +118,7 @@ class StatsOut(BaseModel):
     images_by_category: list[dict]
     phash_count: int = 0
     duplicate_groups: int = 0
+    untagged_images: int = 0
 
 
 # --- Request bodies ---

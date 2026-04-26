@@ -49,6 +49,7 @@ export const updateImageCategory = (id, category) => api.put(`/images/${id}/cate
 export const setImageFavorite = (id, favorite) => api.put(`/images/${id}/favorite`, { favorite }).then((r) => r.data)
 export const getDuplicates = (threshold = 8) => api.get("/images/duplicates", { params: { threshold } }).then((r) => r.data)
 export const startPhashScan = () => api.post("/scan/phash").then((r) => r.data)
+export const startXmpResync = () => api.post("/scan/xmp-resync").then((r) => r.data)
 export const getSentiments = () => api.get("/stats/sentiments").then((r) => r.data)
 export const getFolders = () => api.get("/stats/folders").then((r) => r.data)
 export const getLocations = () => api.get("/stats/locations").then((r) => r.data)

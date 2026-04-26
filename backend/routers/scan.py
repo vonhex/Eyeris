@@ -10,7 +10,7 @@ from database import get_db
 from models import ScanJob
 from schemas import ScanJobOut
 from services.scanner_service import (
-    run_scan, run_phash_scan, run_full_resync,
+    run_scan, run_phash_scan, run_full_resync, run_xmp_resync,
     get_current_job_id, is_scanning, is_paused,
     request_stop, request_pause, request_resume,
     start_background_scanner,
@@ -75,6 +75,16 @@ async def gpu_rescan():
         raise HTTPException(status_code=409, detail="A scan is already running. Stop it first.")
     asyncio.create_task(run_full_resync())
     return {"status": "ok", "message": "Full re-sync started"}
+
+
+@router.post("/xmp-resync")
+async def xmp_resync_scan():
+    """Re-read XMP sidecar files for all images that currently have no tags."""
+    if is_scanning():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=409, detail="A scan is already running. Stop it first.")
+    asyncio.create_task(run_xmp_resync())
+    return {"status": "ok", "message": "XMP re-sync started"}
 
 
 @router.post("/phash")

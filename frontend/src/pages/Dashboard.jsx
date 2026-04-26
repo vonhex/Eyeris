@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { getStats, getScanStatus, startScan, stopScan, startPhashScan } from "../api"
+import { getStats, getScanStatus, startScan, stopScan, startPhashScan, startXmpResync } from "../api"
 import ScanProgress from "../components/ScanProgress"
 import HardwareStats from "../components/HardwareStats"
 
@@ -33,6 +33,9 @@ export default function Dashboard() {
           <StatCard label="Total Images" value={stats.total_images} />
           <StatCard label="Analyzed" value={stats.analyzed_images} />
           <StatCard label="Tags" value={stats.total_tags} />
+          {stats.untagged_images > 0 && (
+            <StatCard label="Untagged" value={stats.untagged_images} accent="orange" />
+          )}
           {stats.duplicate_groups > 0 && (
             <StatCard label="Duplicate Groups" value={stats.duplicate_groups} accent="yellow" />
           )}
@@ -44,6 +47,9 @@ export default function Dashboard() {
 
       {/* Duplicate scan status */}
       <DuplicateScanCard scanJob={scanJob} stats={stats} onNavigate={() => navigate("/duplicates")} />
+
+      {/* XMP tag re-import */}
+      <XmpResyncCard scanJob={scanJob} stats={stats} />
 
       {/* Live hardware stats */}
       <HardwareStats />
@@ -189,10 +195,54 @@ function DuplicateScanCard({ scanJob, stats, onNavigate }) {
   )
 }
 
-function StatCard({ label, value }) {
+function XmpResyncCard({ scanJob, stats }) {
+  const [starting, setStarting] = useState(false)
+  const [error, setError] = useState(null)
+
+  const ACTIVE = ["listing", "running", "analyzing", "gpu_rescan", "phash"]
+  const anyScanRunning = ACTIVE.includes(scanJob?.status)
+  const untagged = stats?.untagged_images ?? null
+
+  const handleStart = async () => {
+    setStarting(true)
+    setError(null)
+    try {
+      await startXmpResync()
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Could not start XMP re-sync")
+    }
+    setStarting(false)
+  }
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-medium text-gray-300">Re-import XMP Tags</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Re-reads sidecar files from disk for images that have no tags yet
+            {untagged !== null && untagged > 0 && ` (${untagged.toLocaleString()} untagged)`}
+          </p>
+        </div>
+        <button
+          onClick={handleStart}
+          disabled={starting || anyScanRunning}
+          title={anyScanRunning ? "Another scan is running" : undefined}
+          className="text-xs px-3 py-1 rounded bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white transition shrink-0"
+        >
+          {starting ? "…" : "Re-import XMP"}
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+    </div>
+  )
+}
+
+function StatCard({ label, value, accent }) {
+  const valueColor = accent === "orange" ? "text-orange-400" : accent === "yellow" ? "text-yellow-400" : "text-white"
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-      <p className="text-2xl font-bold text-white">{value?.toLocaleString()}</p>
+      <p className={`text-2xl font-bold ${valueColor}`}>{value?.toLocaleString()}</p>
       <p className="text-xs text-gray-500 mt-1">{label}</p>
     </div>
   )
