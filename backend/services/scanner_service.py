@@ -332,8 +332,20 @@ async def _discover_image(db: Session, img_info: dict):
     # Check for duplicate by hash
     dupe = db.query(Image).filter(Image.file_hash == file_hash).first()
     if dupe:
-        # (Keep existing deduplication logic, just ensure it handles data=None for videos)
-        # Simplified for now: if it's a dupe, just skip
+        if dupe.file_path != file_path:
+            # Different path — check if the old file still exists
+            old_parts = dupe.file_path.split("/", 1)
+            old_local = _local_path(old_parts[0], old_parts[1] if len(old_parts) > 1 else "")
+            if not os.path.exists(old_local):
+                # Old file is gone — this is a rename (e.g. A-EYE renamed it)
+                print(f"[Scanner] Rename detected: {dupe.file_path} → {file_path}")
+                dupe.file_path = file_path
+                dupe.filename = img_info["filename"]
+                dupe.source_folder = img_info["share"]
+                if file_size:
+                    dupe.file_size = file_size
+                db.flush()
+                await _load_xmp_for_image(db, dupe)
         return
 
     # No duplicate — process normally
@@ -625,13 +637,13 @@ async def run_xmp_resync() -> int:
         db.refresh(job)
         _current_job_id = job.id
 
-        images = db.query(Image).filter(~Image.tags.any()).all()
+        images = db.query(Image).all()
         total = len(images)
         job.phase1_total = total
         job.total_images = total
         db.commit()
 
-        print(f"[XMP Resync] Re-reading XMP sidecars for {total} untagged images...")
+        print(f"[XMP Resync] Re-reading XMP sidecars for {total} images...")
         done = 0
         for img_record in images:
             if _stop_requested:
