@@ -51,6 +51,44 @@ Open **http://localhost:8000** — default username is `eyeris`, password is set
 
 ---
 
+## Features
+
+### Gallery & Browsing
+- Infinite-scroll gallery with thumbnails, favorites, and multi-select bulk actions
+- Filter by tag, category, album, folder, camera, location, date range, GPS, or quality issue
+- Sort by date taken, date added, filename, or random
+- Video support (MP4, MKV, MOV, AVI, WebM and more) with thumbnail preview
+
+### Image Viewer
+- **Desktop:** mouse-wheel zoom (up to 8×), click-drag to pan, double-click to toggle zoom, keyboard ← → to navigate
+- **Mobile:** full-screen view, pinch-to-zoom, horizontal swipe to navigate between images, swipe-up bottom sheet to reveal metadata and editing controls
+- Scroll-to-top button appears site-wide when scrolling long pages
+
+### AI Analysis
+- **Gemma 4 vision** (via llama.cpp): rich descriptions, tags, categories, albums, and sentiment
+- **SigLIP** zero-shot tag classification against ~300 candidates — runs locally on GPU during scan
+- **NudeNet** NSFW detection with automatic NAS quarantine
+- **YOLOv8 + FaceNet** face detection and 512-d embeddings for People clustering
+
+### Metadata & EXIF
+- Date taken, GPS location with OpenStreetMap link, reverse-geocoded city/country
+- Camera make/model, lens model, aperture, shutter speed, ISO, focal length
+- XMP sidecar support (reads tags and descriptions written by tools like A-EYE)
+
+### Organisation
+- Tag editor per image + bulk tag editor across selections
+- Category and album assignment
+- People page: face clusters with optional name labels
+- Duplicate detection via perceptual hash
+
+### System
+- Two-phase async scan pipeline with live progress bar
+- File-watcher for near-real-time new image detection
+- Hardware stats dashboard (CPU, RAM, GPU temp/VRAM)
+- Settings page with runtime `.env` editing
+
+---
+
 ## Screenshots
 
 ### Gallery & Search
