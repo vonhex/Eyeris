@@ -70,6 +70,15 @@ async def lifespan(app_instance: FastAPI):
         except Exception as e:
             print(f"[Startup] Auto-setup: {e}")
 
+    # Apply persisted settings from the JSON backup (survives container recreation
+    # even when the .env file is not volume-mounted on the host)
+    try:
+        from routers.settings import apply_json_settings
+        apply_json_settings()
+        print("[Startup] Applied persisted settings from JSON store")
+    except Exception as e:
+        print(f"[Startup] Settings JSON load: {e}")
+
     # Migrate faces table — add new columns if missing
     try:
         from sqlalchemy import text, inspect as sa_inspect

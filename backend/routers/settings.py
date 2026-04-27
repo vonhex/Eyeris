@@ -1,3 +1,4 @@
+import json
 import os
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -6,6 +7,83 @@ from config import settings
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 ENV_PATH = os.path.join(os.path.dirname(__file__), '..', '..', '.env')
+
+# Keys persisted to the JSON backup store (everything except auth secrets)
+_JSON_KEYS = [
+    "SMB_HOST", "SMB_USERNAME", "SMB_PASSWORD", "SMB_SHARES",
+    "SCAN_CONCURRENCY", "SCAN_INTERVAL_MINUTES",
+    "SCAN_SCHEDULE_ENABLED", "SCAN_SCHEDULE_START", "SCAN_SCHEDULE_END",
+    "SEARXNG_URL",
+]
+
+
+def _settings_json_path() -> str:
+    """Return path to the JSON settings backup inside the mounted /data/db volume."""
+    db_path = os.environ.get("DB_PATH", "")
+    if db_path:
+        return os.path.join(os.path.dirname(db_path), "eyeris_settings.json")
+    return os.path.join(os.path.dirname(ENV_PATH), "eyeris_settings.json")
+
+
+def _save_settings_json(env: dict):
+    """Write runtime-editable settings to a JSON file in the /data/db volume."""
+    path = _settings_json_path()
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        data: dict = {}
+        for k in _JSON_KEYS:
+            if k not in env:
+                continue
+            if k == "SMB_SHARES" and isinstance(env[k], str):
+                data[k] = [s.strip() for s in env[k].split(",") if s.strip()]
+            elif k == "SCAN_CONCURRENCY":
+                data[k] = int(env[k]) if env[k] else 2
+            elif k == "SCAN_INTERVAL_MINUTES":
+                data[k] = int(env[k]) if env[k] else 60
+            elif k == "SCAN_SCHEDULE_ENABLED":
+                val = env[k]
+                data[k] = val if isinstance(val, bool) else str(val).lower() == "true"
+            else:
+                data[k] = env[k]
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"[Settings] Could not write settings JSON: {e}")
+
+
+def apply_json_settings():
+    """Apply settings from the JSON backup to the runtime settings object.
+
+    Called once at startup (after DB init) so values survive container recreation
+    even if the .env file is not mounted.
+    """
+    path = _settings_json_path()
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except Exception:
+        return
+
+    for key, val in data.items():
+        if key == "SMB_SHARES":
+            v = val if isinstance(val, list) else [s.strip() for s in str(val).split(",") if s.strip()]
+            settings.SMB_SHARES = v
+            os.environ["SMB_SHARES"] = ",".join(v)
+        elif key == "SCAN_CONCURRENCY":
+            settings.SCAN_CONCURRENCY = int(val)
+            os.environ["SCAN_CONCURRENCY"] = str(val)
+        elif key == "SCAN_INTERVAL_MINUTES":
+            settings.SCAN_INTERVAL_MINUTES = int(val)
+            os.environ["SCAN_INTERVAL_MINUTES"] = str(val)
+        elif key == "SCAN_SCHEDULE_ENABLED":
+            v = val if isinstance(val, bool) else str(val).lower() == "true"
+            settings.SCAN_SCHEDULE_ENABLED = v
+            os.environ["SCAN_SCHEDULE_ENABLED"] = "true" if v else "false"
+        elif hasattr(settings, key):
+            setattr(settings, key, val)
+            os.environ[key] = str(val)
 
 
 def _read_env() -> dict[str, str]:
@@ -29,6 +107,7 @@ def _write_env(env: dict[str, str]):
         ("# Scanner settings", ["SCAN_CONCURRENCY", "SCAN_INTERVAL_MINUTES"]),
         ("# Scheduled processing window", ["SCAN_SCHEDULE_ENABLED", "SCAN_SCHEDULE_START", "SCAN_SCHEDULE_END"]),
         ("# SearXNG integration", ["SEARXNG_URL"]),
+        ("# Authentication (auto-generated)", ["EYERIS_SECRET_KEY", "EYERIS_PASSWORD_HASH"]),
     ]
     written_keys = set()
     lines = []
@@ -141,6 +220,12 @@ def update_settings(body: SettingsUpdate):
         changed.append("SEARXNG_URL")
 
     _write_env(env)
+    _save_settings_json(env)
+
+    # Sync changed keys into os.environ so in-process reads stay consistent
+    for k in changed:
+        if k in env:
+            os.environ[k] = str(env[k])
 
     # Reset SMB connection cache so new credentials take effect
     if any(k.startswith("SMB_") for k in changed):
