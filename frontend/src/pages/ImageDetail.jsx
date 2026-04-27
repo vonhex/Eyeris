@@ -319,7 +319,7 @@ export default function ImageDetail() {
     }
     el.addEventListener("wheel", onWheel, { passive: false })
     return () => el.removeEventListener("wheel", onWheel)
-  }, [])
+  }, [image])
 
   // ── Desktop: mouse drag to pan ────────────────────────────────────────────
   const onDesktopMouseDown = useCallback((e) => {
@@ -408,7 +408,7 @@ export default function ImageDetail() {
       el.removeEventListener("touchmove", onTouchMove)
       el.removeEventListener("touchend", onTouchEnd)
     }
-  }, [scale, goPrev, goNext])
+  }, [scale, goPrev, goNext, image])
 
   // ── Sheet drag ────────────────────────────────────────────────────────────
   const peekOffset = sheetHeight > PEEK_PX ? sheetHeight - PEEK_PX : 0
