@@ -103,7 +103,7 @@ def request_resume():
 
 async def start_background_scanner():
     """Start the periodic background scanning loop (called on app startup)."""
-    global _scanner_task, _user_stopped
+    global _scanner_task, _user_stopped, _paused
     if _scanner_task and not _scanner_task.done():
         # Already running, just trigger an immediate scan
         _user_stopped = False
@@ -111,6 +111,8 @@ async def start_background_scanner():
         print("[Scanner] Triggered immediate run of existing loop")
         return
     _user_stopped = False
+    _paused = False
+    _pause_event.set()  # clear any leftover pause state
     _scanner_task = asyncio.create_task(_scan_loop())
 
 
