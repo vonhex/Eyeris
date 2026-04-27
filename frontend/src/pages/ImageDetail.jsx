@@ -343,7 +343,17 @@ export default function ImageDetail() {
     return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp) }
   }, [])
 
+  // ── Stable refs so the touch effect never needs to reinstall mid-gesture ──
+  const scaleRef = useRef(scale)
+  const goPrevRef = useRef(goPrev)
+  const goNextRef = useRef(goNext)
+  useEffect(() => { scaleRef.current = scale }, [scale])
+  useEffect(() => { goPrevRef.current = goPrev }, [goPrev])
+  useEffect(() => { goNextRef.current = goNext }, [goNext])
+
   // ── Mobile: pinch-zoom + swipe-to-navigate on image container ────────────
+  // Deps: only [image] — reading scale/nav via refs keeps listeners stable
+  // during an active gesture so wasMultiTouch is never reset mid-pinch.
   useEffect(() => {
     const el = mobileImgContainerRef.current
     if (!el) return
@@ -372,30 +382,36 @@ export default function ImageDetail() {
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         )
-        const ratio = dist / lastPinchDist.current
-        setScale((s) => Math.min(Math.max(s * ratio, 1), 8))
+        setScale((s) => Math.min(Math.max(s * (dist / lastPinchDist.current), 1), 8))
         lastPinchDist.current = dist
       }
     }
 
     const onTouchEnd = (e) => {
       if (e.touches.length < 2) lastPinchDist.current = null
+
+      // Only act when ALL fingers are lifted — prevents double-tap false positives
+      // when two fingers lift in rapid succession after a pinch.
+      if (e.touches.length !== 0) return
+
       setScale((s) => (s < 1.05 ? 1 : s))
 
-      // Double-tap: reset zoom
-      const now = Date.now()
-      if (now - lastTap.current < 300) {
-        setScale(1)
-        setTranslate({ x: 0, y: 0 })
-      }
-      lastTap.current = now
+      if (!wasMultiTouch && e.changedTouches.length > 0) {
+        // Double-tap: reset zoom
+        const now = Date.now()
+        if (now - lastTap.current < 300) {
+          setScale(1)
+          setTranslate({ x: 0, y: 0 })
+        }
+        lastTap.current = now
 
-      // Horizontal swipe to navigate (only when not zoomed, single finger)
-      if (!wasMultiTouch && scale <= 1 && e.changedTouches.length > 0) {
-        const deltaX = e.changedTouches[0].clientX - swipeStartX
-        if (Math.abs(deltaX) > 60) {
-          if (deltaX > 0) goPrev()
-          else goNext()
+        // Horizontal swipe to navigate (only when not zoomed)
+        if (scaleRef.current <= 1) {
+          const deltaX = e.changedTouches[0].clientX - swipeStartX
+          if (Math.abs(deltaX) > 60) {
+            if (deltaX > 0) goPrevRef.current()
+            else goNextRef.current()
+          }
         }
       }
     }
@@ -408,7 +424,7 @@ export default function ImageDetail() {
       el.removeEventListener("touchmove", onTouchMove)
       el.removeEventListener("touchend", onTouchEnd)
     }
-  }, [scale, goPrev, goNext, image])
+  }, [image])
 
   // ── Sheet drag ────────────────────────────────────────────────────────────
   const peekOffset = sheetHeight > PEEK_PX ? sheetHeight - PEEK_PX : 0
