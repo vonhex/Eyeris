@@ -2,7 +2,7 @@ import os
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'), override=True)
 
 
 class Settings:

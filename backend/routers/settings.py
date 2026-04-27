@@ -40,11 +40,6 @@ def _write_env(env: dict[str, str]):
                 written_keys.add(key)
         lines.append("")
 
-    # Write any remaining keys not in sections
-    for key, value in env.items():
-        if key not in written_keys:
-            lines.append(f"{key}={value}")
-
     with open(ENV_PATH, "w") as f:
         f.write("\n".join(lines) + "\n")
 

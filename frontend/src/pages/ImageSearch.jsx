@@ -390,6 +390,8 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
   const lastTap = useRef(0)
   const [scale, setScale] = useState(1)
   const imgContainerRef = useRef(null)
+  const scaleRef = useRef(scale)
+  useEffect(() => { scaleRef.current = scale }, [scale])
 
   // Reset load + zoom when result changes
   useEffect(() => {
@@ -423,10 +425,17 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
     return () => window.removeEventListener("keydown", handler)
   }, [onClose, onPrev, onNext])
 
-  // Pinch-to-zoom (non-passive touchmove)
+  // Mouse-wheel zoom + pinch-to-zoom (both need non-passive listeners)
   useEffect(() => {
     const el = imgContainerRef.current
     if (!el) return
+
+    const onWheel = (e) => {
+      e.preventDefault()
+      const factor = e.deltaY < 0 ? 1.12 : 0.9
+      setScale((s) => Math.min(8, Math.max(1, s * factor)))
+    }
+
     const onMove = (e) => {
       if (e.touches.length === 2 && pinchDist.current !== null) {
         e.preventDefault()
@@ -434,12 +443,17 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         )
-        setScale((s) => Math.min(Math.max(s * (d / pinchDist.current), 1), 5))
+        setScale((s) => Math.min(Math.max(s * (d / pinchDist.current), 1), 8))
         pinchDist.current = d
       }
     }
+
+    el.addEventListener("wheel", onWheel, { passive: false })
     el.addEventListener("touchmove", onMove, { passive: false })
-    return () => el.removeEventListener("touchmove", onMove)
+    return () => {
+      el.removeEventListener("wheel", onWheel)
+      el.removeEventListener("touchmove", onMove)
+    }
   }, [])
 
   const handleTouchStart = (e) => {
@@ -448,30 +462,37 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       )
-    } else {
+      touchStartX.current = null
+    } else if (e.touches.length === 1) {
       touchStartX.current = e.touches[0].clientX
     }
   }
 
   const handleTouchEnd = (e) => {
     if (e.touches.length < 2) pinchDist.current = null
-    setScale((s) => (s < 1.05 ? 1 : s))
 
-    // Double-tap reset zoom
+    // Only act when all fingers are lifted — prevents false double-tap on pinch release
+    if (e.touches.length !== 0) return
+
+    // Double-tap: reset zoom
     const now = Date.now()
-    if (now - lastTap.current < 300) setScale(1)
+    if (now - lastTap.current < 300) {
+      setScale(1)
+      lastTap.current = 0
+      touchStartX.current = null
+      return
+    }
     lastTap.current = now
 
-    // Swipe only when not zoomed
-    if (scale <= 1.05 && touchStartX.current !== null && e.touches.length === 0) {
+    // Swipe to navigate (only when not zoomed and was single touch)
+    if (scaleRef.current <= 1 && touchStartX.current !== null) {
       const dx = e.changedTouches[0].clientX - touchStartX.current
-      touchStartX.current = null
-      if (Math.abs(dx) < 40) return
-      if (dx < 0) onNext()
-      else onPrev()
-    } else {
-      touchStartX.current = null
+      if (Math.abs(dx) >= 50) {
+        if (dx < 0) onNext()
+        else onPrev()
+      }
     }
+    touchStartX.current = null
   }
 
   return (
@@ -487,7 +508,7 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
         ref={imgContainerRef}
       >
         {/* Image/Video Container */}
-        <div className={`relative flex items-center justify-center w-full bg-gray-900 rounded-xl overflow-hidden ${isVideo ? "aspect-video" : ""}`}>
+        <div className={`relative flex items-center justify-center w-full bg-gray-900 rounded-xl ${isVideo ? "aspect-video overflow-hidden" : ""}`}>
           {isVideo ? (
             result.iframe_src ? (
               <iframe
