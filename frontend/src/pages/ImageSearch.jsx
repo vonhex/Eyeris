@@ -389,15 +389,21 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
   const pinchDist = useRef(null)
   const lastTap = useRef(0)
   const [scale, setScale] = useState(1)
+  const [translate, setTranslate] = useState({ x: 0, y: 0 })
   const imgContainerRef = useRef(null)
   const scaleRef = useRef(scale)
+  const translateRef = useRef(translate)
+  const isDragging = useRef(false)
+  const dragAnchor = useRef(null)
   useEffect(() => { scaleRef.current = scale }, [scale])
+  useEffect(() => { translateRef.current = translate }, [translate])
 
   // Reset load + zoom when result changes
   useEffect(() => {
     setLoaded(false)
     setImgError(false)
     setScale(1)
+    setTranslate({ x: 0, y: 0 })
   }, [result.url])
 
   // Preload adjacent images so navigation feels instant (skip for videos)
@@ -425,34 +431,72 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
     return () => window.removeEventListener("keydown", handler)
   }, [onClose, onPrev, onNext])
 
-  // Mouse-wheel zoom + pinch-to-zoom (both need non-passive listeners)
+  // Desktop mouse drag pan
+  const onMouseDown = (e) => {
+    if (scaleRef.current <= 1) return
+    e.preventDefault()
+    isDragging.current = true
+    dragAnchor.current = { x: e.clientX, y: e.clientY, tx: translateRef.current.x, ty: translateRef.current.y }
+  }
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!isDragging.current) return
+      setTranslate({
+        x: dragAnchor.current.tx + e.clientX - dragAnchor.current.x,
+        y: dragAnchor.current.ty + e.clientY - dragAnchor.current.y,
+      })
+    }
+    const onUp = () => { isDragging.current = false }
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp) }
+  }, [])
+
+  // Mouse-wheel zoom + pinch-to-zoom + single-finger pan (all need non-passive listeners)
   useEffect(() => {
     const el = imgContainerRef.current
     if (!el) return
 
+    let panStart = null
+
     const onWheel = (e) => {
       e.preventDefault()
       const factor = e.deltaY < 0 ? 1.12 : 0.9
-      setScale((s) => Math.min(8, Math.max(1, s * factor)))
+      setScale((s) => {
+        const next = Math.min(8, Math.max(1, s * factor))
+        if (next <= 1) { setTranslate({ x: 0, y: 0 }); return 1 }
+        return next
+      })
     }
 
-    const onMove = (e) => {
+    const onTouchMove = (e) => {
       if (e.touches.length === 2 && pinchDist.current !== null) {
         e.preventDefault()
+        panStart = null
         const d = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         )
         setScale((s) => Math.min(Math.max(s * (d / pinchDist.current), 1), 8))
         pinchDist.current = d
+      } else if (e.touches.length === 1 && panStart !== null && scaleRef.current > 1) {
+        e.preventDefault()
+        setTranslate({
+          x: panStart.tx + e.touches[0].clientX - panStart.x,
+          y: panStart.ty + e.touches[0].clientY - panStart.y,
+        })
       }
     }
 
+    el.__setPanStart = (val) => { panStart = val }
+
     el.addEventListener("wheel", onWheel, { passive: false })
-    el.addEventListener("touchmove", onMove, { passive: false })
+    el.addEventListener("touchmove", onTouchMove, { passive: false })
     return () => {
       el.removeEventListener("wheel", onWheel)
-      el.removeEventListener("touchmove", onMove)
+      el.removeEventListener("touchmove", onTouchMove)
+      delete el.__setPanStart
     }
   }, [])
 
@@ -463,8 +507,15 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
         e.touches[0].clientY - e.touches[1].clientY
       )
       touchStartX.current = null
+      imgContainerRef.current?.__setPanStart?.(null)
     } else if (e.touches.length === 1) {
       touchStartX.current = e.touches[0].clientX
+      imgContainerRef.current?.__setPanStart?.({
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        tx: translateRef.current.x,
+        ty: translateRef.current.y,
+      })
     }
   }
 
@@ -474,10 +525,13 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
     // Only act when all fingers are lifted — prevents false double-tap on pinch release
     if (e.touches.length !== 0) return
 
-    // Double-tap: reset zoom
+    imgContainerRef.current?.__setPanStart?.(null)
+
+    // Double-tap: reset zoom + pan
     const now = Date.now()
     if (now - lastTap.current < 300) {
       setScale(1)
+      setTranslate({ x: 0, y: 0 })
       lastTap.current = 0
       touchStartX.current = null
       return
@@ -503,9 +557,11 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
       <div
         className="relative max-w-5xl max-h-[90vh] w-full flex flex-col items-center gap-3"
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={onMouseDown}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         ref={imgContainerRef}
+        style={{ cursor: scale > 1 ? "grab" : "default" }}
       >
         {/* Image/Video Container */}
         <div className={`relative flex items-center justify-center w-full bg-gray-900 rounded-xl ${isVideo ? "aspect-video overflow-hidden" : ""}`}>
@@ -551,7 +607,7 @@ function Lightbox({ result, currentIndex, total, results, selected, onToggle, on
                   src={proxyFull}
                   alt={result.title || ""}
                   className={`max-w-full max-h-[75vh] object-contain transition-opacity ${loaded ? "opacity-100" : "opacity-0"}`}
-                  style={{ transform: `scale(${scale})`, transformOrigin: "center center" }}
+                  style={{ transform: `translate(${translate.x}px,${translate.y}px) scale(${scale})`, transformOrigin: "center center" }}
                   onLoad={() => setLoaded(true)}
                   onError={() => setImgError(true)}
                 />

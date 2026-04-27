@@ -65,14 +65,13 @@ Open **http://localhost:8000** — default username is `eyeris`, password is set
 - Scroll-to-top button appears site-wide when scrolling long pages
 
 ### AI Analysis
-- **Gemma 4 vision** (via llama.cpp): rich descriptions, tags, categories, albums, and sentiment
 - **SigLIP** zero-shot tag classification against ~300 candidates — runs locally on GPU during scan
 - **YOLOv8 + FaceNet** face detection and 512-d embeddings for People clustering
+- **XMP sidecar ingestion**: tags and descriptions written by external tools (e.g. A-EYE) are read automatically during scan
 
 ### Metadata & EXIF
 - Date taken, GPS location with OpenStreetMap link, reverse-geocoded city/country
 - Camera make/model, lens model, aperture, shutter speed, ISO, focal length
-- XMP sidecar support (reads tags and descriptions written by tools like A-EYE)
 
 ### Organisation
 - Tag editor per image + bulk tag editor across selections

@@ -347,12 +347,14 @@ export default function ImageDetail() {
   const scaleRef = useRef(scale)
   const goPrevRef = useRef(goPrev)
   const goNextRef = useRef(goNext)
+  const translateRef = useRef(translate)
   useEffect(() => { scaleRef.current = scale }, [scale])
   useEffect(() => { goPrevRef.current = goPrev }, [goPrev])
   useEffect(() => { goNextRef.current = goNext }, [goNext])
+  useEffect(() => { translateRef.current = translate }, [translate])
 
-  // ── Mobile: pinch-zoom + swipe-to-navigate on image container ────────────
-  // Deps: only [image] — reading scale/nav via refs keeps listeners stable
+  // ── Mobile: pinch-zoom + drag-to-pan + swipe-to-navigate ─────────────────
+  // Deps: only [image] — reading live values via refs keeps listeners stable
   // during an active gesture so wasMultiTouch is never reset mid-pinch.
   useEffect(() => {
     const el = mobileImgContainerRef.current
@@ -360,10 +362,12 @@ export default function ImageDetail() {
 
     let swipeStartX = 0
     let wasMultiTouch = false
+    let panStart = null  // { x, y, tx, ty } — set on single-finger touchstart
 
     const onTouchStart = (e) => {
       if (e.touches.length >= 2) {
         wasMultiTouch = true
+        panStart = null
         lastPinchDist.current = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
@@ -371,19 +375,35 @@ export default function ImageDetail() {
       } else {
         swipeStartX = e.touches[0].clientX
         wasMultiTouch = false
+        panStart = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY,
+          tx: translateRef.current.x,
+          ty: translateRef.current.y,
+        }
       }
     }
 
     const onTouchMove = (e) => {
-      if (e.touches.length >= 2) wasMultiTouch = true
-      if (e.touches.length === 2 && lastPinchDist.current !== null) {
+      if (e.touches.length >= 2) {
+        wasMultiTouch = true
+        panStart = null
+        if (lastPinchDist.current !== null) {
+          e.preventDefault()
+          const dist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          )
+          setScale((s) => Math.min(Math.max(s * (dist / lastPinchDist.current), 1), 8))
+          lastPinchDist.current = dist
+        }
+      } else if (e.touches.length === 1 && panStart !== null && scaleRef.current > 1) {
+        // Single-finger drag to pan when zoomed in
         e.preventDefault()
-        const dist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        )
-        setScale((s) => Math.min(Math.max(s * (dist / lastPinchDist.current), 1), 8))
-        lastPinchDist.current = dist
+        setTranslate({
+          x: panStart.tx + e.touches[0].clientX - panStart.x,
+          y: panStart.ty + e.touches[0].clientY - panStart.y,
+        })
       }
     }
 
@@ -676,7 +696,7 @@ export default function ImageDetail() {
               onMouseDown={onDesktopMouseDown}
               style={{ cursor: scale > 1 ? "grab" : "default" }}
             >
-              <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800 shadow-2xl">
+              <div className="bg-gray-900 rounded-lg border border-gray-800 shadow-2xl">
                 {isVid ? (
                   <video
                     src={fullImageUrl(image.id)}
