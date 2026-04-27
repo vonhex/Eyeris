@@ -394,8 +394,6 @@ export default function ImageDetail() {
       // when two fingers lift in rapid succession after a pinch.
       if (e.touches.length !== 0) return
 
-      setScale((s) => (s < 1.05 ? 1 : s))
-
       if (!wasMultiTouch && e.changedTouches.length > 0) {
         // Double-tap: reset zoom
         const now = Date.now()
