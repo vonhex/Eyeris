@@ -173,7 +173,7 @@ export default function ScanProgress() {
             )}
           </div>
           <p className="text-xs text-gray-600 mt-0.5">
-            {p1Indeterminate ? "Scanning files..." : `Thumbnails + XMP Tags — ${p1Pct}%`}
+            {p1Indeterminate ? "Examining files..." : p1Active ? `Examining files — duplicates skipped — ${p1Pct}%` : `Thumbnails + XMP Tags — ${p1Pct}%`}
           </p>
         </div>
       )}
