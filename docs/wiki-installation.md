@@ -88,7 +88,6 @@ nano .env   # or use any editor you prefer
 | `SCAN_SCHEDULE_END` | Optional | Window end time, e.g. `06:00` |
 | `LLAMA_CPP_URL` | Optional | URL of a running llama.cpp server for AI image descriptions |
 | `SEARXNG_URL` | Optional | URL of a SearXNG instance for web image search |
-| `NSFW_FOLDERS` | Optional | Comma-separated shares where detected NSFW images are auto-moved |
 
 > **Minimum config:** You only need `SMB_HOST`, `SMB_USERNAME`, `SMB_PASSWORD`, and `SMB_SHARES` if your photos are on a NAS. Everything else has safe defaults.
 

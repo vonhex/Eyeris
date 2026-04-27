@@ -67,7 +67,6 @@ Open **http://localhost:8000** — default username is `eyeris`, password is set
 ### AI Analysis
 - **Gemma 4 vision** (via llama.cpp): rich descriptions, tags, categories, albums, and sentiment
 - **SigLIP** zero-shot tag classification against ~300 candidates — runs locally on GPU during scan
-- **NudeNet** NSFW detection with automatic NAS quarantine
 - **YOLOv8 + FaceNet** face detection and 512-d embeddings for People clustering
 
 ### Metadata & EXIF
