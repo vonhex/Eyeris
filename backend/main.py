@@ -148,6 +148,17 @@ async def lifespan(app_instance: FastAPI):
                     conn.execute(text("ALTER TABLE images ADD INDEX ix_images_is_video (is_video)"))
                 print("[Startup] Added images.is_video")
             
+            for col, definition in [
+                ("lens_model", "VARCHAR(255) NULL"),
+                ("aperture", "FLOAT NULL"),
+                ("shutter_speed", "VARCHAR(32) NULL"),
+                ("iso", "INT NULL"),
+                ("focal_length", "FLOAT NULL"),
+            ]:
+                if col not in img_cols:
+                    conn.execute(text(f"ALTER TABLE images ADD COLUMN {col} {definition}"))
+                    print(f"[Startup] Added images.{col}")
+
             # Backfill is_video based on filename extensions
             v_exts = "('.mp4', '.mkv', '.avi', '.mov', '.wmv', '.webm', '.m4v')"
             for ext in [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".m4v"]:

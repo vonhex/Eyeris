@@ -35,6 +35,12 @@ class Image(Base):
     location_name = Column(String(255), nullable=True, index=True)
     # Quality analysis flags (JSON: {"blur": bool, "overexposed": bool, "underexposed": bool, "blur_score": float})
     quality_flags = Column(Text, nullable=True)
+    # Shooting data (EXIF)
+    lens_model = Column(String(255), nullable=True)
+    aperture = Column(Float, nullable=True)        # f-number e.g. 2.8
+    shutter_speed = Column(String(32), nullable=True)  # e.g. "1/125"
+    iso = Column(Integer, nullable=True)
+    focal_length = Column(Float, nullable=True)    # mm
     is_video = Column(Boolean, default=False, nullable=False, server_default="0", index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

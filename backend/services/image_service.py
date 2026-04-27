@@ -124,6 +124,49 @@ def extract_gps(img: Image.Image) -> tuple[float | None, float | None]:
         return None, None
 
 
+def extract_shooting_data(img: Image.Image) -> dict:
+    """Extract aperture, shutter speed, ISO, focal length, and lens model from EXIF."""
+    result = {"aperture": None, "shutter_speed": None, "iso": None, "focal_length": None, "lens_model": None}
+    try:
+        exif = img.getexif()
+        if not exif:
+            return result
+
+        # FNumber (33437) → f-stop float
+        fnumber = exif.get(33437)
+        if fnumber is not None:
+            result["aperture"] = round(_rational_to_float(fnumber), 1)
+
+        # ExposureTime (33434) → "1/125" string
+        exp = exif.get(33434)
+        if exp is not None:
+            val = _rational_to_float(exp)
+            if val > 0:
+                if val >= 1:
+                    result["shutter_speed"] = f"{val:.0f}s" if val == int(val) else f"{val:.1f}s"
+                else:
+                    result["shutter_speed"] = f"1/{round(1/val)}"
+
+        # ISOSpeedRatings (34855)
+        iso = exif.get(34855)
+        if iso is not None:
+            result["iso"] = int(iso) if not hasattr(iso, '__iter__') else int(list(iso)[0])
+
+        # FocalLength (37386) → mm float
+        fl = exif.get(37386)
+        if fl is not None:
+            result["focal_length"] = round(_rational_to_float(fl), 1)
+
+        # LensModel (42036)
+        lens = exif.get(42036)
+        if lens and str(lens).strip():
+            result["lens_model"] = str(lens).strip()
+
+    except Exception:
+        pass
+    return result
+
+
 def extract_camera_model(img: Image.Image) -> str | None:
     """Extract camera make + model from EXIF."""
     try:
@@ -328,6 +371,7 @@ def process_image_bytes(data: bytes) -> dict:
     date_taken = extract_date_taken(original)
     gps_lat, gps_lon = extract_gps(original)
     camera_model = extract_camera_model(original)
+    shooting = extract_shooting_data(original)
 
     location_name = None
     if gps_lat is not None and gps_lon is not None:
@@ -359,6 +403,11 @@ def process_image_bytes(data: bytes) -> dict:
         "camera_model": camera_model,
         "location_name": location_name,
         "quality_flags": quality_flags,
+        "lens_model": shooting["lens_model"],
+        "aperture": shooting["aperture"],
+        "shutter_speed": shooting["shutter_speed"],
+        "iso": shooting["iso"],
+        "focal_length": shooting["focal_length"],
     }
 
 

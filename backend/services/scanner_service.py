@@ -383,6 +383,11 @@ async def _discover_image(db: Session, img_info: dict):
         quality_flags=meta.get("quality_flags"),
         is_video=is_vid,
         analyzed=True,
+        lens_model=meta.get("lens_model"),
+        aperture=meta.get("aperture"),
+        shutter_speed=meta.get("shutter_speed"),
+        iso=meta.get("iso"),
+        focal_length=meta.get("focal_length"),
     )
     db.add(new_img)
     db.flush()

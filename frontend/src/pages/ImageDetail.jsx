@@ -441,6 +441,25 @@ export default function ImageDetail() {
                     <dd className="text-gray-300 text-right max-w-[60%]">{image.camera_model}</dd>
                   </div>
                 )}
+                {image.lens_model && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500">Lens</dt>
+                    <dd className="text-gray-300 text-right max-w-[60%]">{image.lens_model}</dd>
+                  </div>
+                )}
+                {(image.aperture != null || image.shutter_speed || image.iso != null || image.focal_length != null) && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500">Exposure</dt>
+                    <dd className="text-gray-300 text-right font-mono text-xs">
+                      {[
+                        image.aperture != null ? `f/${image.aperture}` : null,
+                        image.shutter_speed || null,
+                        image.iso != null ? `ISO ${image.iso}` : null,
+                        image.focal_length != null ? `${image.focal_length}mm` : null,
+                      ].filter(Boolean).join(" · ")}
+                    </dd>
+                  </div>
+                )}
                 {image.gps_lat != null && image.gps_lon != null && (
                   <div className="flex justify-between">
                     <dt className="text-gray-500">GPS</dt>
