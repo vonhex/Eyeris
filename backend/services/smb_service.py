@@ -26,7 +26,15 @@ def list_images(share: str, subdir: str = "") -> list[dict]:
 
     print(f"[NAS] Listing {share}...")
     # Directories to skip during listing
-    SKIP_DIRS = {"@Recycle", "@Recently-Snapshot", ".@__thumb", "#recycle", ".Trash-1000", "__MACOSX", ".thumbnails", "Thumbnails"}
+    SKIP_DIRS = {
+        "@Recycle", "#recycle",           # QNAP / Synology recycle bins
+        "@Recently-Snapshot",             # QNAP snapshots
+        ".@__thumb", "@eaDir", "eaDir",   # QNAP metadata / thumbnails
+        ".Trash-1000", ".Trash-0",        # Linux trash
+        "$RECYCLE.BIN", "RECYCLER",       # Windows recycle bin
+        "__MACOSX", ".Trashes",           # macOS
+        ".thumbnails", "Thumbnails",      # generic thumbnail caches
+    }
 
     results = []
     for dirpath, dirnames, filenames in os.walk(mount_path):
