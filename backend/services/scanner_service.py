@@ -333,11 +333,10 @@ async def _discover_image(db: Session, img_info: dict):
     dupe = db.query(Image).filter(Image.file_hash == file_hash).first()
     if dupe:
         if dupe.file_path != file_path:
-            # Different path — check if the old file still exists
             old_parts = dupe.file_path.split("/", 1)
             old_local = _local_path(old_parts[0], old_parts[1] if len(old_parts) > 1 else "")
             if not os.path.exists(old_local):
-                # Old file is gone — this is a rename (e.g. A-EYE renamed it)
+                # Original gone — destructive rename, update path and load XMP
                 print(f"[Scanner] Rename detected: {dupe.file_path} → {file_path}")
                 dupe.file_path = file_path
                 dupe.filename = img_info["filename"]
@@ -346,6 +345,10 @@ async def _discover_image(db: Session, img_info: dict):
                     dupe.file_size = file_size
                 db.flush()
                 await _load_xmp_for_image(db, dupe)
+            else:
+                # Both files exist — A-EYE created a renamed copy alongside the original.
+                # Try to load XMP from the new path (A-EYE puts XMP next to the renamed file).
+                await _load_xmp_for_image(db, dupe, xmp_base_path=file_path)
         return
 
     # No duplicate — process normally
@@ -458,12 +461,14 @@ def _save_faces(db: Session, img_record: Image, face_data: list[dict], img_pil=N
         print(f"[Faces] Detected {img_record.face_count} faces in {img_record.filename}")
 
 
-async def _load_xmp_for_image(db: Session, img_record: Image):
+async def _load_xmp_for_image(db: Session, img_record: Image, xmp_base_path: str | None = None):
     """
     Check for an XMP sidecar on the NAS and load its tags/description into DB/ES.
-    XMP path is: <image_path>.xmp
+    xmp_base_path: use this path instead of img_record.file_path to locate the XMP
+                   (e.g. when A-EYE creates a renamed copy alongside the original).
     """
-    parts = img_record.file_path.split("/", 1)
+    base = xmp_base_path or img_record.file_path
+    parts = base.split("/", 1)
     share = parts[0]
     rel_path = parts[1] if len(parts) > 1 else ""
     xmp_rel_path = f"{rel_path}.xmp"
