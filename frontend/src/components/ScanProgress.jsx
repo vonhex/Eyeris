@@ -151,12 +151,12 @@ export default function ScanProgress() {
       )}
 
       {/* Library Sync */}
-      {(isDiscovering || isActive || job.phase1_total > 0) && (
+      {(p1Active || (job.phase1_total > 0 && isActive)) && (
         <div>
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-gray-400 flex items-center gap-1.5">
               <span className="inline-block w-2 h-2 rounded-full bg-green-500" style={{ opacity: p1Active ? 1 : 0.3 }} />
-              Library Sync (A-Eye Tags)
+              Library Sync
             </span>
             <span className="text-xs text-gray-500">
               {job.phase1_done.toLocaleString()} / {job.phase1_total.toLocaleString()}
@@ -173,7 +173,7 @@ export default function ScanProgress() {
             )}
           </div>
           <p className="text-xs text-gray-600 mt-0.5">
-            {p1Indeterminate ? "Scanning files..." : `Duplicates + Thumbnails + XMP Tags — ${p1Pct}%`}
+            {p1Indeterminate ? "Scanning files..." : `Thumbnails + XMP Tags — ${p1Pct}%`}
           </p>
         </div>
       )}
