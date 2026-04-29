@@ -287,7 +287,16 @@ def get_hardware_stats():
 @router.get("", response_model=StatsOut)
 def get_stats(db: Session = Depends(get_db)):
     total_images = db.query(func.count(Image.id)).scalar() or 0
-    analyzed_images = db.query(func.count(Image.id)).filter(Image.analyzed == True).scalar() or 0
+    # "Has AI content" = has a description OR at least one tag
+    tagged_images = db.query(func.count(Image.id)).filter(Image.tags.any()).scalar() or 0
+    described_images = (
+        db.query(func.count(Image.id))
+        .filter(Image.ai_description.isnot(None), Image.ai_description != "")
+        .scalar() or 0
+    )
+    analyzed_images = db.query(func.count(Image.id)).filter(
+        (Image.ai_description.isnot(None) & (Image.ai_description != "")) | Image.tags.any()
+    ).scalar() or 0
     total_tags = db.query(func.count(Tag.id)).scalar() or 0
     total_categories = db.query(func.count(Category.id)).scalar() or 0
 
@@ -333,6 +342,8 @@ def get_stats(db: Session = Depends(get_db)):
     return StatsOut(
         total_images=total_images,
         analyzed_images=analyzed_images,
+        tagged_images=tagged_images,
+        described_images=described_images,
         total_tags=total_tags,
         total_categories=total_categories,
         images_by_folder=images_by_folder,

@@ -31,8 +31,9 @@ export default function Dashboard() {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard label="Total Images" value={stats.total_images} />
-          <StatCard label="Analyzed" value={stats.analyzed_images} />
-          <StatCard label="Tags" value={stats.total_tags} />
+          <StatCard label="Tagged" value={stats.tagged_images ?? stats.analyzed_images} />
+          <StatCard label="With Description" value={stats.described_images ?? 0} />
+          <StatCard label="Tag Vocabulary" value={stats.total_tags} />
           {stats.untagged_images > 0 && (
             <StatCard label="Untagged" value={stats.untagged_images} accent="orange" />
           )}
