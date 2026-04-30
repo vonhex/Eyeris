@@ -2,7 +2,6 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { getStats, getScanStatus, startScan, stopScan, startPhashScan, startXmpResync } from "../api"
 import ScanProgress from "../components/ScanProgress"
-import HardwareStats from "../components/HardwareStats"
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
@@ -51,9 +50,6 @@ export default function Dashboard() {
 
       {/* XMP tag re-import */}
       <XmpResyncCard scanJob={scanJob} stats={stats} />
-
-      {/* Live hardware stats */}
-      <HardwareStats />
 
       {/* Images by folder */}
       {stats && Object.keys(stats.images_by_folder).length > 0 && (

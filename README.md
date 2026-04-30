@@ -20,7 +20,7 @@
 | Who it's for | Method | Guide |
 |---|---|---|
 | **Unraid users** | Manual install via template — see the wiki | [Unraid →](https://github.com/vonhex/Eyeris/wiki/Installation#path-1-unraid) |
-| **Everyone else** (Linux / Windows / macOS with Docker) | Run `./docker-start.sh` — auto-detects your GPU | [Docker →](https://github.com/vonhex/Eyeris/wiki/Installation#path-2-docker) |
+| **Everyone else** (Linux / Windows / macOS with Docker) | Run `./docker-start.sh` | [Docker →](https://github.com/vonhex/Eyeris/wiki/Installation#path-2-docker) |
 | **Developers** | Run `./start.sh` — Python + Node directly, no Docker | [Dev →](https://github.com/vonhex/Eyeris/wiki/Installation#path-3-developer--manual) |
 
 > Not sure? **Use the Docker path.** It works on any OS and handles everything automatically.
@@ -41,13 +41,11 @@ chmod +x docker-start.sh
 # 3. Edit .env with your NAS credentials (SMB_HOST, SMB_USERNAME, etc.)
 nano .env
 
-# 4. Run again — auto-detects your GPU, pulls the image, starts the container
+# 4. Run again — pulls the image and starts the container
 ./docker-start.sh
 ```
 
 Open **http://localhost:8000** — default username is `eyeris`, password is set on first run.
-
-> **NVIDIA users:** Install [`nvidia-container-toolkit`](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) on your host first. The script handles the rest.
 
 ---
 
@@ -82,7 +80,6 @@ Open **http://localhost:8000** — default username is `eyeris`, password is set
 ### System
 - Two-phase async scan pipeline with live progress bar
 - File-watcher for near-real-time new image detection
-- Hardware stats dashboard (CPU, RAM, GPU temp/VRAM)
 - Settings page with runtime `.env` editing
 
 ---

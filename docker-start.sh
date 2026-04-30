@@ -18,23 +18,6 @@ if [ ! -f .env ]; then
     fi
 fi
 
-# ── GPU detection ─────────────────────────────────────────────────────────────
-GPU="cpu"
-
-if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null 2>&1; then
-    GPU="nvidia"
-elif [ -c /dev/kfd ]; then
-    GPU="amd"
-elif [ -d /dev/dri ] && lspci 2>/dev/null | grep -qiE 'intel.*(graphics|uhd|iris|arc)'; then
-    GPU="intel"
-fi
-
-echo "  GPU mode : $GPU"
-
-# ── Build compose command ──────────────────────────────────────────────────────
-COMPOSE_FILES=(-f docker-compose.yml)
-[ "$GPU" != "cpu" ] && COMPOSE_FILES+=(-f "docker-compose.${GPU}.yml")
-
 # Pass --build to force a local image build (dev use)
 EXTRA_ARGS=()
 for arg in "$@"; do
@@ -43,7 +26,7 @@ done
 
 # ── Launch ────────────────────────────────────────────────────────────────────
 echo "  Starting Eyeris..."
-docker compose "${COMPOSE_FILES[@]}" up -d "${EXTRA_ARGS[@]}"
+docker compose -f docker-compose.yml up -d "${EXTRA_ARGS[@]}"
 
 echo ""
 echo "  Eyeris is running → http://localhost:8000"
