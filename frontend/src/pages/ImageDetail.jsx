@@ -212,9 +212,16 @@ export default function ImageDetail() {
   const isDragging = useRef(false)
   const dragAnchor = useRef({ x: 0, y: 0, tx: 0, ty: 0 })
 
-  // ── Video refs (prevent double audio from both mobile+desktop elements) ──
-  const mobileVideoRef = useRef(null)
-  const desktopVideoRef = useRef(null)
+  // ── Track viewport so only one layout (and one <video>) renders at a time.
+  // CSS display:none doesn't reliably stop video audio; this ensures only one
+  // <video> element ever exists in the DOM.
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches)
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)")
+    const handler = (e) => setIsMobile(e.matches)
+    mq.addEventListener("change", handler)
+    return () => mq.removeEventListener("change", handler)
+  }, [])
 
   // ── Mobile bottom sheet ───────────────────────────────────────────────────
   const sheetRef = useRef(null)
@@ -490,19 +497,6 @@ export default function ImageDetail() {
   useEffect(() => { fetchImage() }, [id])
   useEffect(() => { getCategories().then(setCategories).catch(() => {}) }, [])
 
-  // Pause whichever video element is off-screen — both exist in the DOM at
-  // the same time (one for mobile, one for desktop) and both have autoPlay,
-  // which causes double audio when only one is visible via CSS.
-  useEffect(() => {
-    if (!mobileVideoRef.current && !desktopVideoRef.current) return
-    const isDesktop = window.matchMedia('(min-width: 768px)').matches
-    if (isDesktop) {
-      mobileVideoRef.current?.pause()
-    } else {
-      desktopVideoRef.current?.pause()
-    }
-  }, [id])
-
   const handleToggleFavorite = async () => {
     if (!image) return
     setTogglingFav(true)
@@ -554,9 +548,8 @@ export default function ImageDetail() {
     <>
       {/* ══════════════════════════════════════════════════════════════════════
           MOBILE: full-screen image + swipe-up bottom sheet
-          (hidden on md+ breakpoints)
       ══════════════════════════════════════════════════════════════════════ */}
-      <div className="md:hidden fixed inset-0 z-50 bg-black">
+      {isMobile && <div className="fixed inset-0 z-50 bg-black">
         {/* Image area fills entire screen */}
         <div
           ref={mobileImgContainerRef}
@@ -564,7 +557,6 @@ export default function ImageDetail() {
         >
           {isVid ? (
             <video
-              ref={mobileVideoRef}
               src={fullImageUrl(image.id)}
               controls
               autoPlay
@@ -658,13 +650,12 @@ export default function ImageDetail() {
             <DetailContent {...detailProps} />
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* ══════════════════════════════════════════════════════════════════════
           DESKTOP: sidebar layout
-          (hidden on mobile, shown on md+)
       ══════════════════════════════════════════════════════════════════════ */}
-      <div className="hidden md:block p-6">
+      {!isMobile && <div className="p-6">
         {/* Top nav bar */}
         <div className="flex items-center justify-between mb-4">
           <button onClick={() => navigate(-1)} className="text-blue-500 hover:text-blue-400 text-sm">
@@ -717,7 +708,6 @@ export default function ImageDetail() {
               <div className="bg-gray-900 rounded-lg border border-gray-800 shadow-2xl">
                 {isVid ? (
                   <video
-                    ref={desktopVideoRef}
                     src={fullImageUrl(image.id)}
                     controls
                     autoPlay
@@ -778,7 +768,7 @@ export default function ImageDetail() {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
     </>
   )
 }
