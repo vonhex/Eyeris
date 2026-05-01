@@ -212,6 +212,10 @@ export default function ImageDetail() {
   const isDragging = useRef(false)
   const dragAnchor = useRef({ x: 0, y: 0, tx: 0, ty: 0 })
 
+  // ── Video refs (prevent double audio from both mobile+desktop elements) ──
+  const mobileVideoRef = useRef(null)
+  const desktopVideoRef = useRef(null)
+
   // ── Mobile bottom sheet ───────────────────────────────────────────────────
   const sheetRef = useRef(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -486,6 +490,19 @@ export default function ImageDetail() {
   useEffect(() => { fetchImage() }, [id])
   useEffect(() => { getCategories().then(setCategories).catch(() => {}) }, [])
 
+  // Pause whichever video element is off-screen — both exist in the DOM at
+  // the same time (one for mobile, one for desktop) and both have autoPlay,
+  // which causes double audio when only one is visible via CSS.
+  useEffect(() => {
+    if (!mobileVideoRef.current && !desktopVideoRef.current) return
+    const isDesktop = window.matchMedia('(min-width: 768px)').matches
+    if (isDesktop) {
+      mobileVideoRef.current?.pause()
+    } else {
+      desktopVideoRef.current?.pause()
+    }
+  }, [id])
+
   const handleToggleFavorite = async () => {
     if (!image) return
     setTogglingFav(true)
@@ -547,6 +564,7 @@ export default function ImageDetail() {
         >
           {isVid ? (
             <video
+              ref={mobileVideoRef}
               src={fullImageUrl(image.id)}
               controls
               autoPlay
@@ -699,6 +717,7 @@ export default function ImageDetail() {
               <div className="bg-gray-900 rounded-lg border border-gray-800 shadow-2xl">
                 {isVid ? (
                   <video
+                    ref={desktopVideoRef}
                     src={fullImageUrl(image.id)}
                     controls
                     autoPlay
