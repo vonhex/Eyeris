@@ -17,7 +17,8 @@ router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 @router.get("", response_model=StatsOut)
 def get_stats(db: Session = Depends(get_db)):
-    total_images = db.query(func.count(Image.id)).scalar() or 0
+    total_videos = db.query(func.count(Image.id)).filter(Image.is_video == True).scalar() or 0
+    total_images = (db.query(func.count(Image.id)).scalar() or 0) - total_videos
     # "Has AI content" = has a description OR at least one tag
     tagged_images = db.query(func.count(Image.id)).filter(Image.tags.any()).scalar() or 0
     described_images = (
@@ -72,6 +73,7 @@ def get_stats(db: Session = Depends(get_db)):
 
     return StatsOut(
         total_images=total_images,
+        total_videos=total_videos,
         analyzed_images=analyzed_images,
         tagged_images=tagged_images,
         described_images=described_images,

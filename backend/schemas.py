@@ -115,6 +115,7 @@ class ScanJobOut(BaseModel):
 # --- Stats ---
 class StatsOut(BaseModel):
     total_images: int
+    total_videos: int = 0
     analyzed_images: int       # kept for API compat — now means "has AI content"
     tagged_images: int = 0     # images with ≥1 tag (from XMP or manual)
     described_images: int = 0  # images with an AI description

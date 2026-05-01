@@ -30,6 +30,9 @@ export default function Dashboard() {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard label="Total Images" value={stats.total_images} />
+          {stats.total_videos > 0 && (
+            <StatCard label="Videos" value={stats.total_videos} />
+          )}
           <StatCard label="Tagged" value={stats.tagged_images ?? stats.analyzed_images} />
           <StatCard label="With Description" value={stats.described_images ?? 0} />
           <StatCard label="Tag Vocabulary" value={stats.total_tags} />
@@ -62,7 +65,7 @@ export default function Dashboard() {
                 <div className="flex-1 bg-gray-800 rounded-full h-2">
                   <div
                     className="bg-green-600 h-2 rounded-full"
-                    style={{ width: `${(count / stats.total_images) * 100}%` }}
+                    style={{ width: `${(count / (stats.total_images + (stats.total_videos ?? 0))) * 100}%` }}
                   />
                 </div>
                 <span className="text-sm text-gray-500 w-12 text-right">{count}</span>
