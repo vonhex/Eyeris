@@ -60,11 +60,15 @@ def detect_faces(image_bytes: bytes) -> list[dict]:
         return []
     try:
         img = Image.open(BytesIO(image_bytes)).convert("RGB")
-        results = model.predict(img, conf=0.4, verbose=False, device=DEVICE)
+        results = model.predict(img, conf=0.5, verbose=False, device=DEVICE)
         faces = []
         for r in results:
             for box in r.boxes:
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
+                # Skip tiny detections — crops smaller than 60×60 produce
+                # degenerate FaceNet embeddings that all cluster together
+                if (x2 - x1) < 60 or (y2 - y1) < 60:
+                    continue
                 center_x = (x1 + x2) / 2 / img.width
                 position = "left" if center_x < 0.33 else "right" if center_x > 0.66 else "center"
                 faces.append({

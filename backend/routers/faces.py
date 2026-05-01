@@ -19,12 +19,21 @@ router = APIRouter(prefix="/api/faces", tags=["faces"])
 # Clustering helper
 # ---------------------------------------------------------------------------
 
-def _do_cluster_faces(db: Session, threshold: float = 0.65) -> int:
+def _do_cluster_faces(db: Session, threshold: float = 0.82) -> int:
     """
-    Cluster faces with embeddings using cosine similarity (union-find).
+    Cluster faces with embeddings using hierarchical clustering (average linkage).
     Returns the number of clusters created.
     Threshold: cosine similarity >= threshold means same person.
+
+    Faces with bounding boxes smaller than MIN_FACE_PX in either dimension are
+    excluded — tiny crops produce degenerate FaceNet embeddings that collapse
+    into one giant spurious cluster.
     """
+    from scipy.cluster.hierarchy import linkage, fcluster
+    from scipy.spatial.distance import squareform
+
+    MIN_FACE_PX = 60
+
     faces = db.query(Face).filter(Face.embedding.isnot(None), Face.ignored.is_(False)).all()
     if len(faces) < 1:
         return 0
@@ -33,8 +42,18 @@ def _do_cluster_faces(db: Session, threshold: float = 0.65) -> int:
     valid = []
     for f in faces:
         try:
-            embs.append(json.loads(f.embedding))
-            valid.append(f)
+            # Skip faces with tiny bounding boxes
+            if f.face_bbox:
+                bbox = json.loads(f.face_bbox)
+                if len(bbox) == 4:
+                    w = bbox[2] - bbox[0]
+                    h = bbox[3] - bbox[1]
+                    if w < MIN_FACE_PX or h < MIN_FACE_PX:
+                        continue
+            e = json.loads(f.embedding)
+            if len(e) == 512:
+                embs.append(e)
+                valid.append(f)
         except Exception:
             pass
 
@@ -42,45 +61,56 @@ def _do_cluster_faces(db: Session, threshold: float = 0.65) -> int:
         return 0
 
     arr = np.array(embs, dtype=np.float32)
-    # L2-normalise so dot product == cosine similarity
+    # L2-normalise for cosine distance
     norms = np.linalg.norm(arr, axis=1, keepdims=True)
     arr = arr / (norms + 1e-8)
 
     n = len(arr)
-    parent = list(range(n))
+    if n < 2:
+        for face in valid:
+            face.cluster_id = 0
+        db.commit()
+        return 1
 
-    def find(x: int) -> int:
-        root = x
-        while parent[root] != root:
-            root = parent[root]
-        while parent[x] != root:
-            parent[x], x = root, parent[x]
-        return root
+    # Compute cosine distance matrix (1 - similarity)
+    # We use (1 - sims) because fcluster/linkage use distance, not similarity.
+    # The max distance is (1 - threshold).
+    dist_threshold = 1.0 - threshold
 
-    def union(a: int, b: int):
-        parent[find(a)] = find(b)
+    # For very large datasets, compute distance in chunks to avoid O(N^2) memory crash
+    # However, 'linkage' itself needs the full condensed matrix.
+    # 9k faces = ~40 million pairs = ~160MB in float32. Manageable.
+    
+    # Efficiently compute cosine distance matrix
+    sims = arr @ arr.T
+    # Clip for safety and convert to distance
+    dists = 1.0 - np.clip(sims, -1.0, 1.0)
+    
+    # Fill diagonal with 0s (self-similarity)
+    np.fill_diagonal(dists, 0)
+    
+    # Convert to condensed distance matrix for scipy
+    condensed_dists = squareform(dists, checks=False)
+    
+    # Perform Agglomerative Clustering with Average Linkage
+    # This means a face is added to a cluster if its average distance to existing
+    # members is within the threshold.
+    Z = linkage(condensed_dists, method='average')
+    
+    # Form clusters
+    cluster_labels = fcluster(Z, dist_threshold, criterion='distance')
+    
+    # Clear all existing cluster assignments first so excluded faces
+    # (tiny bboxes, bad embeddings) don't linger in stale clusters.
+    db.query(Face).filter(Face.ignored.is_(False)).update({"cluster_id": None})
+    db.flush()
 
-    # Pairwise similarity — process in chunks to be memory-friendly
-    chunk = 500
-    for i in range(0, n, chunk):
-        sims = arr[i : i + chunk] @ arr.T  # (chunk_size, n)
-        for ci, row in enumerate(sims):
-            gi = i + ci
-            for j in range(gi + 1, n):
-                if row[j] >= threshold:
-                    union(gi, j)
-
-    root_to_cid: dict[int, int] = {}
-    cid = 0
+    # Assign new cluster labels (fcluster is 1-based)
     for i, face in enumerate(valid):
-        root = find(i)
-        if root not in root_to_cid:
-            root_to_cid[root] = cid
-            cid += 1
-        face.cluster_id = root_to_cid[root]
+        face.cluster_id = int(cluster_labels[i])
 
     db.commit()
-    return cid
+    return int(np.max(cluster_labels))
 
 
 # ---------------------------------------------------------------------------
@@ -248,10 +278,17 @@ def list_unknown_faces(
 
 
 @router.post("/cluster")
-def run_clustering(db: Session = Depends(get_db)):
+def run_clustering(body: dict | None = None, db: Session = Depends(get_db)):
     """Re-cluster all faces that have embeddings."""
-    count = _do_cluster_faces(db)
-    return {"status": "ok", "clusters": count}
+    threshold = 0.82
+    if body and "threshold" in body:
+        try:
+            threshold = float(body["threshold"])
+        except ValueError:
+            pass
+    
+    count = _do_cluster_faces(db, threshold=threshold)
+    return {"status": "ok", "clusters": count, "threshold": threshold}
 
 
 @router.post("/cluster/merge")
