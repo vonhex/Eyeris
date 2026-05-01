@@ -34,6 +34,7 @@ def get_stats(db: Session = Depends(get_db)):
 
     folder_counts = (
         db.query(Image.source_folder, func.count(Image.id))
+        .filter(Image.is_video == False)
         .group_by(Image.source_folder)
         .all()
     )
@@ -131,29 +132,30 @@ def get_quality_summary(db: Session = Depends(get_db)):
 
 @router.get("/folders")
 def get_folders(db: Session = Depends(get_db)):
-    # Fetch all paths and analyzed status to group in Python
-    # (Cross-compatible way to find unique folders without complex dialect-specific SQL)
-    rows = db.query(Image.file_path, Image.analyzed, Image.id).all()
-    
+    rows = db.query(Image.file_path, Image.analyzed, Image.id, Image.is_video).all()
+
     folders_map = {}
-    for fp, analyzed, img_id in rows:
-        # Extract folder part (e.g., "photos/2023/vacation/img.jpg" -> "photos/2023/vacation")
+    for fp, analyzed, img_id, is_vid in rows:
         folder_path = os.path.dirname(fp)
         if not folder_path:
             continue
-            
+
         if folder_path not in folders_map:
             folders_map[folder_path] = {
                 "folder": folder_path,
                 "total": 0,
                 "analyzed": 0,
-                "sample_image_id": img_id,
+                "sample_image_id": None,
             }
-        
-        folders_map[folder_path]["total"] += 1
-        if analyzed:
-            folders_map[folder_path]["analyzed"] += 1
-            
-    # Sort by folder path alphabetically
-    sorted_folders = sorted(folders_map.values(), key=lambda x: x["folder"])
-    return sorted_folders
+
+        if not is_vid:
+            folders_map[folder_path]["total"] += 1
+            if analyzed:
+                folders_map[folder_path]["analyzed"] += 1
+            # Use the first non-video image as the folder thumbnail
+            if folders_map[folder_path]["sample_image_id"] is None:
+                folders_map[folder_path]["sample_image_id"] = img_id
+
+    # Exclude folders that contain only videos (no images)
+    image_folders = [f for f in folders_map.values() if f["total"] > 0]
+    return sorted(image_folders, key=lambda x: x["folder"])
