@@ -45,7 +45,7 @@ def analyze_images(body: dict, db: Session = Depends(get_db)):
         for img in images:
             rel = _aeye_path(img.file_path)
             try:
-                resp = client.post(f"{base}/analyze-path", json={"path": rel})
+                resp = client.post(f"{base}/api/analyze-path", json={"path": rel})
                 resp.raise_for_status()
                 sent += 1
             except Exception as exc:
@@ -75,7 +75,7 @@ def analyze_untagged(db: Session = Depends(get_db)):
         for img in images:
             rel = _aeye_path(img.file_path)
             try:
-                resp = client.post(f"{base}/analyze-path", json={"path": rel})
+                resp = client.post(f"{base}/api/analyze-path", json={"path": rel})
                 resp.raise_for_status()
                 sent += 1
             except Exception as exc:
