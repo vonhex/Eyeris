@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/aeye", tags=["aeye"])
 
-_TIMEOUT = 60.0  # vision inference can take a while
+_TIMEOUT = 300.0  # match A-Eye's internal generate timeout (vision inference can be slow)
 
 
 def _aeye_client() -> httpx.Client:
@@ -78,7 +78,9 @@ def _send_thumbnail(client: httpx.Client, img: Image, base: str, db: Session) ->
     )
     resp.raise_for_status()
     result = resp.json()
-    _apply_aeye_result(db, img, result)
+    added = _apply_aeye_result(db, img, result)
+    logger.info("A-Eye thumbnail result for video %s: %d tags, description=%s",
+                img.id, added, bool(result.get("description")))
     return True
 
 
