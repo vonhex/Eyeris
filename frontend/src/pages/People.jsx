@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { getPeople, clusterFaces, nameCluster, thumbnailUrl, faceCropUrl, getUnknownFaces, mergeClusters, updateFaceName, deleteCluster, deleteClusters } from "../api"
+import { getPeople, clusterFaces, nameCluster, thumbnailUrl, faceCropUrl, getUnknownFaces, mergeClusters, updateFaceName, deleteCluster, deleteClusters, aeyeDescribeFaces, aeyeFaceDescribeStatus, unpinCluster, mergeByDescription } from "../api"
 
 // ---------------------------------------------------------------------------
 // Person card
 // ---------------------------------------------------------------------------
-function PersonCard({ cluster, onRename, onDelete, selectMode, selectSelected, onSelectToggle }) {
+function PersonCard({ cluster, onRename, onDelete, onUnpin, selectMode, selectSelected, onSelectToggle }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(cluster.person_name || "")
   const navigate = useNavigate()
@@ -67,6 +67,12 @@ function PersonCard({ cluster, onRename, onDelete, selectMode, selectSelected, o
             </svg>
           </button>
         )}
+        {/* Pin badge */}
+        {cluster.pinned && (
+          <div className="absolute top-1.5 left-1.5 bg-black/70 rounded px-1 py-0.5 flex items-center gap-1">
+            <span className="text-xs">📌</span>
+          </div>
+        )}
       </div>
 
       <div className="p-3">
@@ -99,12 +105,26 @@ function PersonCard({ cluster, onRename, onDelete, selectMode, selectSelected, o
         <p className="text-xs text-gray-500 mt-1">
           {cluster.face_count} photo{cluster.face_count !== 1 ? "s" : ""}
         </p>
+        {cluster.pinned && !inSelectMode && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onUnpin(cluster.cluster_id) }}
+            className="text-xs text-yellow-600 hover:text-yellow-400 mt-1 transition"
+            title="Allow regroup to reassign this cluster"
+          >
+            Unpin
+          </button>
+        )}
+        {cluster.description && (
+          <p className="text-xs text-gray-500 mt-1 line-clamp-2 italic" title={cluster.description}>
+            {cluster.description}
+          </p>
+        )}
       </div>
     </div>
   )
 }
 
-function PeopleGrid({ clusters, onRename, onDelete, selectMode, selectSelected, onSelectToggle }) {
+function PeopleGrid({ clusters, onRename, onDelete, onUnpin, selectMode, selectSelected, onSelectToggle }) {
   if (!clusters.length) return null
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -114,6 +134,7 @@ function PeopleGrid({ clusters, onRename, onDelete, selectMode, selectSelected, 
             cluster={c}
             onRename={onRename}
             onDelete={onDelete}
+            onUnpin={onUnpin}
             selectMode={selectMode}
             selectSelected={selectSelected}
             onSelectToggle={onSelectToggle}
@@ -227,6 +248,10 @@ export function PeopleList() {
   const [selectSelected, setSelectSelected] = useState(new Set())
   const [merging, setMerging] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [describing, setDescribing] = useState(false)
+  const [describeJob, setDescribeJob] = useState(null) // null | {running, total, done, errors}
+  const [mergingByDesc, setMergingByDesc] = useState(false)
+  const describePollerRef = useRef(null)
 
   const load = () => {
     setLoading(true)
@@ -237,6 +262,24 @@ export function PeopleList() {
   }
 
   useEffect(() => { load() }, [])
+
+  // Poll face-describe status while a job is running
+  useEffect(() => {
+    if (describeJob?.running) {
+      describePollerRef.current = setInterval(async () => {
+        try {
+          const status = await aeyeFaceDescribeStatus()
+          setDescribeJob(status)
+          if (!status.running) {
+            clearInterval(describePollerRef.current)
+            setDescribing(false)
+            load()
+          }
+        } catch (_) {}
+      }, 3000)
+    }
+    return () => clearInterval(describePollerRef.current)
+  }, [describeJob?.running])
 
   const handleCluster = async () => {
     setClustering(true)
@@ -265,6 +308,15 @@ export function PeopleList() {
       load()
     } catch (err) {
       alert(err?.response?.data?.detail || "Delete failed")
+    }
+  }
+
+  const handleUnpin = async (clusterId) => {
+    try {
+      await unpinCluster(clusterId)
+      load()
+    } catch (err) {
+      alert(err?.response?.data?.detail || "Unpin failed")
     }
   }
 
@@ -309,11 +361,47 @@ export function PeopleList() {
     setDeleting(false)
   }
 
+  const handleDescribeWithAeye = async () => {
+    setDescribing(true)
+    setError(null)
+    try {
+      const result = await aeyeDescribeFaces()
+      if (result.queued === 0) {
+        setDescribing(false)
+        alert(result.message || "No clusters to describe")
+        return
+      }
+      // Start polling
+      const status = await aeyeFaceDescribeStatus()
+      setDescribeJob(status)
+    } catch (err) {
+      setDescribing(false)
+      setError(err?.response?.data?.detail || "Failed to start face description job")
+    }
+  }
+
+  const handleMergeByDescription = async () => {
+    setMergingByDesc(true)
+    setError(null)
+    try {
+      const result = await mergeByDescription()
+      load()
+      if (result.merged_groups > 0) {
+        // Show brief feedback inline rather than a blocking alert
+        setError(null)
+      }
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Merge by description failed")
+    }
+    setMergingByDesc(false)
+  }
+
   const cancelSelectMode = () => { setSelectMode(null); setSelectSelected(new Set()) }
 
   if (loading) return <div className="p-6 text-gray-500">Loading people...</div>
 
   const { clusters = [], has_embeddings = false, unclustered_count = 0 } = data || {}
+  const hasDescriptions = clusters.some((c) => c.description)
 
   return (
     <div className="p-6">

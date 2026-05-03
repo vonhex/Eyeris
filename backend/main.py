@@ -102,6 +102,9 @@ async def lifespan(app_instance: FastAPI):
             if "ignored" not in face_cols:
                 conn.execute(text("ALTER TABLE faces ADD COLUMN ignored TINYINT(1) NOT NULL DEFAULT 0"))
                 print("[Startup] Added faces.ignored")
+            if "pinned" not in face_cols:
+                conn.execute(text("ALTER TABLE faces ADD COLUMN pinned TINYINT(1) NOT NULL DEFAULT 0"))
+                print("[Startup] Added faces.pinned")
             
             is_sqlite = "sqlite" in str(engine.url)
             if "ix_faces_cluster_id" not in face_indexes:

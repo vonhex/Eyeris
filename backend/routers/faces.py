@@ -28,13 +28,19 @@ def _do_cluster_faces(db: Session, threshold: float = 0.82) -> int:
     Faces with bounding boxes smaller than MIN_FACE_PX in either dimension are
     excluded — tiny crops produce degenerate FaceNet embeddings that collapse
     into one giant spurious cluster.
+
+    Pinned faces (from manual merges/names) are preserved and not re-clustered.
+    New cluster IDs are offset so they don't collide with pinned cluster IDs.
     """
     from scipy.cluster.hierarchy import linkage, fcluster
     from scipy.spatial.distance import squareform
 
     MIN_FACE_PX = 60
 
-    faces = db.query(Face).filter(Face.embedding.isnot(None), Face.ignored.is_(False)).all()
+    # Only cluster non-pinned faces
+    faces = db.query(Face).filter(
+        Face.embedding.isnot(None), Face.ignored.is_(False), Face.pinned == False
+    ).all()
     if len(faces) < 1:
         return 0
 
@@ -66,9 +72,17 @@ def _do_cluster_faces(db: Session, threshold: float = 0.82) -> int:
     arr = arr / (norms + 1e-8)
 
     n = len(arr)
+
+    # Compute offset so new IDs don't collide with pinned cluster IDs
+    offset = (db.query(func.max(Face.cluster_id)).filter(Face.pinned == True).scalar() or 0) + 1
+
+    # Clear cluster assignments on non-pinned faces only
+    db.query(Face).filter(Face.ignored.is_(False), Face.pinned == False).update({"cluster_id": None})
+    db.flush()
+
     if n < 2:
         for face in valid:
-            face.cluster_id = 0
+            face.cluster_id = offset
         db.commit()
         return 1
 
@@ -80,34 +94,29 @@ def _do_cluster_faces(db: Session, threshold: float = 0.82) -> int:
     # For very large datasets, compute distance in chunks to avoid O(N^2) memory crash
     # However, 'linkage' itself needs the full condensed matrix.
     # 9k faces = ~40 million pairs = ~160MB in float32. Manageable.
-    
+
     # Efficiently compute cosine distance matrix
     sims = arr @ arr.T
     # Clip for safety and convert to distance
     dists = 1.0 - np.clip(sims, -1.0, 1.0)
-    
+
     # Fill diagonal with 0s (self-similarity)
     np.fill_diagonal(dists, 0)
-    
+
     # Convert to condensed distance matrix for scipy
     condensed_dists = squareform(dists, checks=False)
-    
+
     # Perform Agglomerative Clustering with Average Linkage
     # This means a face is added to a cluster if its average distance to existing
     # members is within the threshold.
     Z = linkage(condensed_dists, method='average')
-    
+
     # Form clusters
     cluster_labels = fcluster(Z, dist_threshold, criterion='distance')
-    
-    # Clear all existing cluster assignments first so excluded faces
-    # (tiny bboxes, bad embeddings) don't linger in stale clusters.
-    db.query(Face).filter(Face.ignored.is_(False)).update({"cluster_id": None})
-    db.flush()
 
-    # Assign new cluster labels (fcluster is 1-based)
+    # Assign new cluster labels offset to avoid collision with pinned IDs
     for i, face in enumerate(valid):
-        face.cluster_id = int(cluster_labels[i])
+        face.cluster_id = int(cluster_labels[i]) + offset
 
     db.commit()
     return int(np.max(cluster_labels))
@@ -171,6 +180,7 @@ def list_people(db: Session = Depends(get_db)):
         func.count(Face.id).label("face_count"),
         func.min(Face.id).label("sample_face_id"),
         func.min(Face.image_id).label("sample_image_id"),
+        func.max(Face.pinned).label("pinned"),
     ).filter(Face.cluster_id.isnot(None)).group_by(Face.cluster_id).order_by(func.count(Face.id).desc())
 
     clusters_raw = cluster_q.all()
@@ -232,6 +242,8 @@ def list_people(db: Session = Depends(get_db)):
                 "sample_face_id": sample.id if sample else row.sample_face_id,
                 "sample_image_id": row.sample_image_id,
                 "has_crop": bool(sample and sample.crop_path),
+                "pinned": bool(row.pinned),
+                "description": sample.description if sample else None,
             })
 
     has_embeddings = db.query(Face.id).filter(Face.embedding.isnot(None), Face.ignored.is_(False)).first() is not None
@@ -317,6 +329,9 @@ def merge_clusters(body: dict, db: Session = Depends(get_db)):
         )
         updated += n
 
+    # Pin all faces in the target cluster so they survive regroup
+    db.query(Face).filter(Face.cluster_id == target_id).update({"pinned": True})
+
     db.commit()
     return {"status": "ok", "merged_faces": updated, "target_cluster_id": target_id}
 
@@ -357,12 +372,115 @@ def name_cluster(cluster_id: int, body: dict, db: Session = Depends(get_db)):
     updated = (
         db.query(Face)
         .filter(Face.cluster_id == cluster_id)
-        .update({"person_name": name})
+        .update({"person_name": name, "pinned": True})
     )
     db.commit()
     if updated == 0:
         raise HTTPException(status_code=404, detail="Cluster not found")
     return {"status": "ok", "updated": updated}
+
+
+@router.delete("/cluster/{cluster_id}/pin")
+def unpin_cluster(cluster_id: int, db: Session = Depends(get_db)):
+    """Remove the pinned flag from a cluster so regroup can reassign it."""
+    updated = db.query(Face).filter(Face.cluster_id == cluster_id).update({"pinned": False})
+    db.commit()
+    return {"status": "ok", "unpinned": updated}
+
+
+@router.post("/cluster/merge-by-description")
+def merge_by_description(db: Session = Depends(get_db)):
+    """Auto-merge clusters whose representative faces share >=60% meaningful words in description."""
+    STOPWORDS = {
+        "a", "an", "the", "of", "with", "and", "in", "is", "are", "has",
+        "wearing", "photo", "photograph", "image", "shows", "close", "up", "closeup",
+    }
+
+    def meaningful_words(text: str) -> set:
+        words = set(text.lower().split())
+        return words - STOPWORDS
+
+    # Find all clusters that have a crop with a description
+    desc_rows = (
+        db.query(Face.cluster_id, Face.description)
+        .filter(
+            Face.cluster_id.isnot(None),
+            Face.description.isnot(None),
+            Face.crop_path.isnot(None),
+        )
+        .distinct(Face.cluster_id)
+        .all()
+    )
+
+    if not desc_rows:
+        return {"merged_groups": 0, "faces_reassigned": 0}
+
+    # Build {cluster_id: set_of_words}
+    cluster_words = {}
+    for row in desc_rows:
+        words = meaningful_words(row.description)
+        if words:
+            cluster_words[row.cluster_id] = words
+
+    cluster_ids = list(cluster_words.keys())
+    n = len(cluster_ids)
+
+    # Union-Find for grouping similar clusters
+    parent = {cid: cid for cid in cluster_ids}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(x, y):
+        parent[find(x)] = find(y)
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            a, b = cluster_ids[i], cluster_ids[j]
+            wa, wb = cluster_words[a], cluster_words[b]
+            if not wa or not wb:
+                continue
+            intersection = len(wa & wb)
+            smaller = min(len(wa), len(wb))
+            if smaller > 0 and intersection / smaller >= 0.6:
+                union(a, b)
+
+    # Build groups: root -> list of cluster_ids
+    groups: dict = {}
+    for cid in cluster_ids:
+        root = find(cid)
+        groups.setdefault(root, []).append(cid)
+
+    # Only merge groups of 2+
+    merged_groups = 0
+    faces_reassigned = 0
+    for root, members in groups.items():
+        if len(members) < 2:
+            continue
+
+        # Target = cluster with the most faces
+        counts = {}
+        for cid in members:
+            counts[cid] = db.query(func.count(Face.id)).filter(Face.cluster_id == cid).scalar() or 0
+        target_id = max(counts, key=lambda c: counts[c])
+
+        for src_id in members:
+            if src_id == target_id:
+                continue
+            n_updated = db.query(Face).filter(Face.cluster_id == src_id).update(
+                {"cluster_id": target_id}
+            )
+            faces_reassigned += n_updated
+
+        # Pin all faces in target cluster
+        db.query(Face).filter(Face.cluster_id == target_id).update({"pinned": True})
+        merged_groups += 1
+
+    db.commit()
+    return {"merged_groups": merged_groups, "faces_reassigned": faces_reassigned}
 
 
 @router.get("/{face_id}/crop")

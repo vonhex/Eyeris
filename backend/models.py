@@ -107,6 +107,7 @@ class Face(Base):
     embedding = Column(Text, nullable=True)           # JSON array of floats
     crop_path = Column(String(512), nullable=True)
     ignored = Column(Boolean, default=False, nullable=False, server_default="0")
+    pinned = Column(Boolean, default=False, nullable=False, server_default="0")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     image = relationship("Image", back_populates="faces")

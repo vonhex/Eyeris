@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from database import get_db, SessionLocal
-from models import Image, Tag, ImageTag
+from models import Image, Tag, ImageTag, Face
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,10 @@ _job: dict = {
     "current": "",   # filename of item currently being processed
 }
 _job_lock = threading.Lock()
+
+# Module-level face-describe job state
+_face_job: dict = {"running": False, "total": 0, "done": 0, "errors": 0}
+_face_job_lock = threading.Lock()
 
 
 def _aeye_client() -> httpx.Client:
@@ -194,3 +198,94 @@ def analyze_untagged(db: Session = Depends(get_db)):
     t.start()
 
     return {"queued": len(image_ids), "message": f"Sending {len(image_ids)} items to A-Eye in the background"}
+
+
+@router.get("/face-describe-status")
+def face_describe_status():
+    """Return current face-describe job progress."""
+    with _face_job_lock:
+        return dict(_face_job)
+
+
+def _run_describe_faces(cluster_ids: list[int], base: str) -> None:
+    """Background worker: send one representative crop per cluster to A-Eye for description."""
+    with _face_job_lock:
+        _face_job.update({"running": True, "total": len(cluster_ids), "done": 0, "errors": 0})
+
+    db = SessionLocal()
+    try:
+        with _aeye_client() as client:
+            for cluster_id in cluster_ids:
+                face = (
+                    db.query(Face)
+                    .filter(Face.cluster_id == cluster_id, Face.crop_path.isnot(None))
+                    .first()
+                )
+                if not face or not face.crop_path:
+                    with _face_job_lock:
+                        _face_job["done"] += 1
+                    continue
+
+                crop_full = os.path.join(settings.THUMBNAIL_DIR, face.crop_path)
+                if not os.path.exists(crop_full):
+                    with _face_job_lock:
+                        _face_job["done"] += 1
+                    continue
+
+                try:
+                    with open(crop_full, "rb") as f:
+                        crop_bytes = f.read()
+                    resp = client.post(
+                        f"{base}/api/analyze-image",
+                        files={"file": (face.crop_path, crop_bytes, "image/jpeg")},
+                    )
+                    resp.raise_for_status()
+                    result = resp.json()
+                    description = (result.get("description") or "").strip()
+                    if description:
+                        face.description = description
+                    db.commit()
+                except Exception as exc:
+                    logger.warning("A-Eye face describe: failed on cluster %s: %s", cluster_id, exc)
+                    with _face_job_lock:
+                        _face_job["errors"] += 1
+
+                with _face_job_lock:
+                    _face_job["done"] += 1
+
+        logger.info("A-Eye face describe: completed %d / %d clusters", _face_job["done"], len(cluster_ids))
+    except Exception as exc:
+        logger.error("A-Eye face describe worker error: %s", exc)
+    finally:
+        db.close()
+        with _face_job_lock:
+            _face_job["running"] = False
+
+
+@router.post("/describe-faces")
+def describe_faces(db: Session = Depends(get_db)):
+    """Queue one representative crop per cluster for A-Eye face description."""
+    if not settings.AEYE_URL:
+        raise HTTPException(400, "A-Eye URL is not configured — set it in Settings")
+
+    with _face_job_lock:
+        if _face_job["running"]:
+            return {"queued": 0, "message": "Face describe job already running", "status": dict(_face_job)}
+
+    # All distinct cluster_ids that have a crop_path
+    rows = (
+        db.query(Face.cluster_id)
+        .filter(Face.cluster_id.isnot(None), Face.crop_path.isnot(None))
+        .distinct()
+        .all()
+    )
+    cluster_ids = [r.cluster_id for r in rows]
+
+    if not cluster_ids:
+        return {"queued": 0, "message": "No clusters with crop images found"}
+
+    base = settings.AEYE_URL.rstrip("/")
+    t = threading.Thread(target=_run_describe_faces, args=(cluster_ids, base), daemon=True)
+    t.start()
+
+    return {"queued": len(cluster_ids)}

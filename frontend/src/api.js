@@ -62,10 +62,14 @@ export const clusterFaces = (threshold) => api.post("/faces/cluster", threshold 
 export const aeyeAnalyzeUntagged = () => api.post("/aeye/analyze-untagged").then((r) => r.data)
 export const aeyeAnalyzeImages = (imageIds) => api.post("/aeye/analyze", { image_ids: imageIds }).then((r) => r.data)
 export const aeyeStatus = () => api.get("/aeye/status").then((r) => r.data)
+export const aeyeDescribeFaces = () => api.post("/aeye/describe-faces").then((r) => r.data)
+export const aeyeFaceDescribeStatus = () => api.get("/aeye/face-describe-status").then((r) => r.data)
 export const nameCluster = (clusterId, name) => api.put(`/faces/cluster/${clusterId}/name`, { name }).then((r) => r.data)
 export const mergeClusters = (sourceIds, targetId) => api.post("/faces/cluster/merge", { source_cluster_ids: sourceIds, target_cluster_id: targetId }).then((r) => r.data)
 export const deleteCluster = (clusterId) => api.delete(`/faces/cluster/${clusterId}`).then((r) => r.data)
 export const deleteClusters = (clusterIds) => api.post("/faces/clusters/delete", { cluster_ids: clusterIds }).then((r) => r.data)
+export const unpinCluster = (clusterId) => api.delete(`/faces/cluster/${clusterId}/pin`).then((r) => r.data)
+export const mergeByDescription = () => api.post("/faces/cluster/merge-by-description").then((r) => r.data)
 const getToken = () => localStorage.getItem("eyeris_auth_token") || ""
 export const faceCropUrl = (faceId) => `/api/faces/${faceId}/crop?token=${getToken()}`
 export const resetDatabase = () => api.post("/scan/reset").then((r) => r.data)
