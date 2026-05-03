@@ -61,6 +61,7 @@ export const updateFaceName = (faceId, name) => api.put(`/faces/${faceId}/name`,
 export const clusterFaces = (threshold) => api.post("/faces/cluster", threshold ? { threshold } : undefined).then((r) => r.data)
 export const aeyeAnalyzeUntagged = () => api.post("/aeye/analyze-untagged").then((r) => r.data)
 export const aeyeAnalyzeImages = (imageIds) => api.post("/aeye/analyze", { image_ids: imageIds }).then((r) => r.data)
+export const aeyeStatus = () => api.get("/aeye/status").then((r) => r.data)
 export const nameCluster = (clusterId, name) => api.put(`/faces/cluster/${clusterId}/name`, { name }).then((r) => r.data)
 export const mergeClusters = (sourceIds, targetId) => api.post("/faces/cluster/merge", { source_cluster_ids: sourceIds, target_cluster_id: targetId }).then((r) => r.data)
 export const deleteCluster = (clusterId) => api.delete(`/faces/cluster/${clusterId}`).then((r) => r.data)

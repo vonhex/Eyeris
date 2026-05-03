@@ -16,6 +16,16 @@ router = APIRouter(prefix="/api/aeye", tags=["aeye"])
 
 _TIMEOUT = 300.0  # match A-Eye's internal generate timeout (vision inference can be slow)
 
+# Module-level job state — updated by the background thread, polled by /status
+_job: dict = {
+    "running": False,
+    "total": 0,
+    "done": 0,
+    "errors": 0,
+    "current": "",   # filename of item currently being processed
+}
+_job_lock = threading.Lock()
+
 
 def _aeye_client() -> httpx.Client:
     auth = (settings.AEYE_USER, settings.AEYE_PASS) if settings.AEYE_USER else None
@@ -84,6 +94,13 @@ def _send_thumbnail(client: httpx.Client, img: Image, base: str, db: Session) ->
     return True
 
 
+@router.get("/status")
+def aeye_status():
+    """Return current A-Eye job progress."""
+    with _job_lock:
+        return dict(_job)
+
+
 @router.post("/analyze")
 def analyze_images(body: dict, db: Session = Depends(get_db)):
     """Send specific images (or video thumbnails) to A-Eye for AI analysis."""
@@ -117,12 +134,16 @@ def analyze_images(body: dict, db: Session = Depends(get_db)):
 
 def _run_analyze_untagged(image_ids: list[int], base: str) -> None:
     """Background worker: send untagged images/videos to A-Eye. Runs in a thread."""
+    with _job_lock:
+        _job.update({"running": True, "total": len(image_ids), "done": 0, "errors": 0, "current": ""})
+
     db = SessionLocal()
     try:
         images = db.query(Image).filter(Image.id.in_(image_ids)).all()
-        sent = 0
         with _aeye_client() as client:
             for img in images:
+                with _job_lock:
+                    _job["current"] = img.filename or str(img.id)
                 try:
                     if img.is_video:
                         _send_thumbnail(client, img, base, db)
@@ -130,15 +151,21 @@ def _run_analyze_untagged(image_ids: list[int], base: str) -> None:
                         rel = _aeye_path(img.file_path)
                         resp = client.post(f"{base}/api/analyze-path", json={"path": rel})
                         resp.raise_for_status()
-                    sent += 1
+                    # commit each item so results appear immediately
+                    db.commit()
+                    with _job_lock:
+                        _job["done"] += 1
                 except Exception as exc:
                     logger.warning("A-Eye: failed on image %s: %s", img.id, exc)
-        db.commit()
-        logger.info("A-Eye: sent %d / %d items", sent, len(images))
+                    with _job_lock:
+                        _job["errors"] += 1
+        logger.info("A-Eye: completed %d / %d items", _job["done"], len(images))
     except Exception as exc:
         logger.error("A-Eye background worker error: %s", exc)
     finally:
         db.close()
+        with _job_lock:
+            _job.update({"running": False, "current": ""})
 
 
 @router.post("/analyze-untagged")
@@ -146,6 +173,14 @@ def analyze_untagged(db: Session = Depends(get_db)):
     """Queue all untagged images and videos for A-Eye analysis and return immediately."""
     if not settings.AEYE_URL:
         raise HTTPException(400, "A-Eye URL is not configured — set it in Settings")
+
+    with _job_lock:
+        if _job["running"]:
+            return {
+                "queued": 0,
+                "message": "A-Eye job already running",
+                "status": dict(_job),
+            }
 
     images = db.query(Image).filter(~Image.tags.any()).all()
 

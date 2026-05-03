@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { getSettings, getStats, getScanStatus, startScan, stopScan, startPhashScan, startXmpResync, aeyeAnalyzeUntagged } from "../api"
+import { getSettings, getStats, getScanStatus, startScan, stopScan, startPhashScan, startXmpResync, aeyeAnalyzeUntagged, aeyeStatus } from "../api"
 import ScanProgress from "../components/ScanProgress"
 
 export default function Dashboard() {
@@ -57,7 +57,7 @@ export default function Dashboard() {
       <XmpResyncCard scanJob={scanJob} stats={stats} />
 
       {/* A-Eye integration */}
-      {aeyeUrl && <AeyeCard stats={stats} scanJob={scanJob} />}
+      {aeyeUrl && <AeyeCard stats={stats} />}
 
       {/* Images by folder */}
       {stats && Object.keys(stats.images_by_folder).length > 0 && (
@@ -243,56 +243,80 @@ function XmpResyncCard({ scanJob, stats }) {
   )
 }
 
-function AeyeCard({ stats, scanJob }) {
-  const [sending, setSending] = useState(false)
-  const [result, setResult] = useState(null)
+function AeyeCard({ stats }) {
+  const [job, setJob] = useState(null)
   const [error, setError] = useState(null)
 
-  const ACTIVE = ["listing", "running", "analyzing", "gpu_rescan", "phash"]
-  const anyScanRunning = ACTIVE.includes(scanJob?.status)
+  // Poll job status every 3s; on mount check if a job is already running
+  useEffect(() => {
+    let interval
+    const poll = () => aeyeStatus().then(setJob).catch(() => {})
+    poll()
+    interval = setInterval(poll, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
   const untagged = (stats?.untagged_images ?? 0) + (stats?.untagged_videos ?? 0)
+  const isRunning = job?.running === true
+  const pct = job?.total > 0 ? Math.round((job.done / job.total) * 100) : 0
 
   const handleSend = async () => {
-    setSending(true)
-    setResult(null)
     setError(null)
     try {
       const r = await aeyeAnalyzeUntagged()
-      setResult(r)
+      if (r.queued > 0) setJob({ running: true, total: r.queued, done: 0, errors: 0, current: "" })
     } catch (err) {
       setError(err?.response?.data?.detail || "Failed to send to A-Eye")
     }
-    setSending(false)
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-2">
+    <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-medium text-gray-300">Analyze with A-Eye</h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            Send untagged images and videos to your A-Eye instance for AI analysis.
-            {untagged > 0 && ` ${untagged.toLocaleString()} untagged item${untagged !== 1 ? "s" : ""} will be sent.`}
-            {untagged === 0 && " No untagged items — all caught up."}
+            {isRunning
+              ? `Processing ${job.done.toLocaleString()} / ${job.total.toLocaleString()} items${job.current ? ` — ${job.current}` : ""}…`
+              : untagged > 0
+              ? `${untagged.toLocaleString()} untagged item${untagged !== 1 ? "s" : ""} ready to send.`
+              : "No untagged items — all caught up."}
           </p>
         </div>
         <button
           onClick={handleSend}
-          disabled={sending || anyScanRunning || untagged === 0}
-          title={anyScanRunning ? "A scan is running" : untagged === 0 ? "No untagged images" : undefined}
+          disabled={isRunning || untagged === 0}
+          title={isRunning ? "A-Eye job already running" : untagged === 0 ? "No untagged items" : undefined}
           className="text-xs px-3 py-1 rounded bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white transition shrink-0"
         >
-          {sending ? "Sending…" : "Send to A-Eye"}
+          {isRunning ? "Running…" : "Send to A-Eye"}
         </button>
       </div>
-      {result && result.queued > 0 && (
+
+      {isRunning && (
+        <div>
+          <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Sending to A-Eye…</span>
+            <span>{job.done?.toLocaleString()} / {job.total?.toLocaleString()} ({pct}%)</span>
+          </div>
+          <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+            <div
+              className="h-2 rounded-full bg-blue-500 transition-all duration-500"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          {job.errors > 0 && (
+            <p className="text-xs text-yellow-500 mt-1">{job.errors} failed so far</p>
+          )}
+        </div>
+      )}
+
+      {!isRunning && job?.done > 0 && (
         <p className="text-xs text-green-400">
-          Queued {result.queued} item{result.queued !== 1 ? "s" : ""} — A-Eye is analysing in the background. Tags will auto-import within a few minutes.
+          Last run: {job.done.toLocaleString()} sent{job.errors > 0 ? `, ${job.errors} failed` : ""}. Tags auto-import every 5 minutes.
         </p>
       )}
-      {result && result.queued === 0 && (
-        <p className="text-xs text-gray-500">No untagged items found.</p>
-      )}
+
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   )
