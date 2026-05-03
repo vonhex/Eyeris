@@ -39,6 +39,8 @@ export default function Settings() {
         scan_schedule_end: settings.scan_schedule_end || "06:00",
         searxng_url: settings.searxng_url || "",
         aeye_url: settings.aeye_url || "",
+        aeye_user: settings.aeye_user || "",
+        ...(settings.aeye_pass ? { aeye_pass: settings.aeye_pass } : {}),
       }
       if (smbPassword) payload.smb_password = smbPassword
       await updateSettings(payload)
@@ -216,13 +218,30 @@ export default function Settings() {
             type="text"
             value={settings.aeye_url || ""}
             onChange={(e) => setSettings({ ...settings, aeye_url: e.target.value })}
-            placeholder="http://a-eye:8001"
+            placeholder="http://10.0.1.x:8001"
             className="input-field"
           />
           <p className="text-xs text-gray-600 mt-1">
             URL of a running A-Eye instance. When set, untagged images can be sent to A-Eye for AI analysis.
-            Both apps must share the same photos volume — A-Eye will write XMP sidecar files which Eyeris can then re-import.
+            Both apps must share the same photos volume — A-Eye writes XMP sidecars which Eyeris re-imports.
           </p>
+        </Field>
+        <Field label="A-Eye Username">
+          <input
+            type="text"
+            value={settings.aeye_user || ""}
+            onChange={(e) => setSettings({ ...settings, aeye_user: e.target.value })}
+            placeholder="admin"
+            className="input-field"
+          />
+        </Field>
+        <Field label="A-Eye Password">
+          <input
+            type="password"
+            onChange={(e) => setSettings({ ...settings, aeye_pass: e.target.value })}
+            placeholder="leave blank to keep existing"
+            className="input-field"
+          />
         </Field>
       </Section>
 

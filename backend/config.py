@@ -53,6 +53,8 @@ class Settings:
 
     # A-Eye integration (optional — enables "Analyze with A-Eye" for untagged images)
     AEYE_URL: str = os.getenv("AEYE_URL", "")
+    AEYE_USER: str = os.getenv("AEYE_USER", "")
+    AEYE_PASS: str = os.getenv("AEYE_PASS", "")
 
     # Scanner
     SCAN_CONCURRENCY: int = int(os.getenv("SCAN_CONCURRENCY", "2"))

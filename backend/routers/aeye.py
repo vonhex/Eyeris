@@ -11,6 +11,11 @@ router = APIRouter(prefix="/api/aeye", tags=["aeye"])
 _TIMEOUT = 10.0
 
 
+def _aeye_client() -> httpx.Client:
+    auth = (settings.AEYE_USER, settings.AEYE_PASS) if settings.AEYE_USER else None
+    return httpx.Client(timeout=_TIMEOUT, auth=auth)
+
+
 def _aeye_path(file_path: str) -> str:
     """Strip the SMB share prefix from an Eyeris file_path to get the A-Eye relative path.
 
@@ -36,7 +41,7 @@ def analyze_images(body: dict, db: Session = Depends(get_db)):
     base = settings.AEYE_URL.rstrip("/")
 
     sent, errors = 0, []
-    with httpx.Client(timeout=_TIMEOUT) as client:
+    with _aeye_client() as client:
         for img in images:
             rel = _aeye_path(img.file_path)
             try:
@@ -66,7 +71,7 @@ def analyze_untagged(db: Session = Depends(get_db)):
 
     base = settings.AEYE_URL.rstrip("/")
     sent, errors = 0, []
-    with httpx.Client(timeout=_TIMEOUT) as client:
+    with _aeye_client() as client:
         for img in images:
             rel = _aeye_path(img.file_path)
             try:
