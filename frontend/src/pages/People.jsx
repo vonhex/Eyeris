@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { getPeople, clusterFaces, nameCluster, thumbnailUrl, faceCropUrl, getUnknownFaces, mergeClusters, updateFaceName, deleteCluster, deleteClusters, aeyeDescribeFaces, aeyeFaceDescribeStatus, unpinCluster, mergeByDescription } from "../api"
+import { getPeople, clusterFaces, nameCluster, thumbnailUrl, faceCropUrl, getUnknownFaces, mergeClusters, updateFaceName, deleteCluster, deleteClusters, aeyeDescribeFaces, aeyeFaceDescribeStatus, aeyeLlmFaceRescan, unpinCluster, mergeByDescription } from "../api"
 
 // ---------------------------------------------------------------------------
 // Person card
@@ -251,6 +251,7 @@ export function PeopleList() {
   const [describing, setDescribing] = useState(false)
   const [describeJob, setDescribeJob] = useState(null) // null | {running, total, done, errors}
   const [mergingByDesc, setMergingByDesc] = useState(false)
+  const [llmRescanRunning, setLlmRescanRunning] = useState(false)
   const describePollerRef = useRef(null)
 
   const load = () => {
@@ -273,6 +274,7 @@ export function PeopleList() {
           if (!status.running) {
             clearInterval(describePollerRef.current)
             setDescribing(false)
+            setLlmRescanRunning(false)
             load()
           }
         } catch (_) {}
@@ -380,6 +382,28 @@ export function PeopleList() {
     }
   }
 
+  const handleLlmFaceRescan = async () => {
+    if (!window.confirm(
+      "This will delete all non-pinned face data and re-detect people in every image using A-Eye.\n\nThis can take a long time. Continue?"
+    )) return
+    setLlmRescanRunning(true)
+    setError(null)
+    try {
+      const result = await aeyeLlmFaceRescan()
+      if (result.queued === 0) {
+        alert(result.message || "Nothing to process")
+        setLlmRescanRunning(false)
+        return
+      }
+      // Reuse describeJob state to show progress
+      const status = await aeyeFaceDescribeStatus()
+      setDescribeJob(status)
+    } catch (err) {
+      setError(err?.response?.data?.detail || "LLM face rescan failed to start")
+      setLlmRescanRunning(false)
+    }
+  }
+
   const handleMergeByDescription = async () => {
     setMergingByDesc(true)
     setError(null)
@@ -480,10 +504,18 @@ export function PeopleList() {
               </div>
               <button
                 onClick={handleCluster}
-                disabled={clustering}
+                disabled={clustering || llmRescanRunning || describeJob?.running}
                 className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition"
               >
                 {clustering ? "Grouping faces..." : clusters.length ? "Re-group Faces" : "Group Faces"}
+              </button>
+              <button
+                onClick={handleLlmFaceRescan}
+                disabled={llmRescanRunning || describeJob?.running || clustering}
+                title="Clear all face data and re-detect people using A-Eye's vision model"
+                className="text-sm px-4 py-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-white rounded-lg transition"
+              >
+                {llmRescanRunning || (describeJob?.running && llmRescanRunning) ? "Rescanning…" : "LLM Rescan"}
               </button>
             </div>
           )}

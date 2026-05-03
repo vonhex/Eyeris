@@ -64,6 +64,7 @@ export const aeyeAnalyzeImages = (imageIds) => api.post("/aeye/analyze", { image
 export const aeyeStatus = () => api.get("/aeye/status").then((r) => r.data)
 export const aeyeDescribeFaces = () => api.post("/aeye/describe-faces").then((r) => r.data)
 export const aeyeFaceDescribeStatus = () => api.get("/aeye/face-describe-status").then((r) => r.data)
+export const aeyeLlmFaceRescan = () => api.post("/aeye/llm-face-rescan").then((r) => r.data)
 export const nameCluster = (clusterId, name) => api.put(`/faces/cluster/${clusterId}/name`, { name }).then((r) => r.data)
 export const mergeClusters = (sourceIds, targetId) => api.post("/faces/cluster/merge", { source_cluster_ids: sourceIds, target_cluster_id: targetId }).then((r) => r.data)
 export const deleteCluster = (clusterId) => api.delete(`/faces/cluster/${clusterId}`).then((r) => r.data)

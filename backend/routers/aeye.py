@@ -289,3 +289,133 @@ def describe_faces(db: Session = Depends(get_db)):
     t.start()
 
     return {"queued": len(cluster_ids)}
+
+
+# ---------------------------------------------------------------------------
+# LLM face rescan — replace YOLO/FaceNet with A-Eye descriptions
+# ---------------------------------------------------------------------------
+
+_FACE_RESCAN_CONTEXT = (
+    "Focus only on the people in this image. "
+    "For each distinct person, describe them on a separate line as: "
+    "'Person N: <gender>, <age range>, <hair color and length>, <notable features like glasses/beard>'. "
+    "Example: 'Person 1: woman, 30s, long brown hair, glasses'. "
+    "If there are no people, reply with exactly: no people."
+)
+
+_NO_PEOPLE_PHRASES = {
+    "no people", "no person", "no human", "nobody", "no one",
+    "no faces", "no face", "no individuals", "empty",
+}
+
+
+def _parse_face_descriptions(description: str) -> list[str]:
+    """Return a list of per-person description strings from the LLM output."""
+    import re
+    lines = [l.strip() for l in description.splitlines() if l.strip()]
+    if not lines:
+        return []
+
+    # Check if the model said there are no people
+    combined = " ".join(lines).lower().strip(".").strip()
+    if any(phrase in combined for phrase in _NO_PEOPLE_PHRASES):
+        return []
+
+    # Try to find "Person N: ..." lines
+    person_lines = [l for l in lines if re.match(r"(?i)^person\s*\d+\s*:", l)]
+    if person_lines:
+        return [re.sub(r"(?i)^person\s*\d+\s*:\s*", "", l).strip() for l in person_lines]
+
+    # Fallback: if the description is short and mentions a person, treat as single face
+    lower = combined.lower()
+    if any(w in lower for w in ("woman", "man", "person", "girl", "boy", "child", "adult", "face")):
+        return [combined]
+
+    return []
+
+
+def _run_llm_face_rescan(image_ids: list[int], base: str) -> None:
+    """Background worker: LLM-based face detection via A-Eye on full image thumbnails."""
+    import json as _json
+
+    with _face_job_lock:
+        _face_job.update({"running": True, "total": len(image_ids), "done": 0, "errors": 0})
+
+    db = SessionLocal()
+    try:
+        # Clear all non-pinned faces first
+        db.query(Face).filter(Face.pinned == False).delete(synchronize_session=False)
+        db.commit()
+        logger.info("LLM face rescan: cleared non-pinned faces, processing %d images", len(image_ids))
+
+        images = db.query(Image).filter(Image.id.in_(image_ids), Image.is_video == False).all()
+
+        with _aeye_client() as client:
+            for img in images:
+                with _face_job_lock:
+                    _face_job["done"] += 1
+
+                if not img.thumbnail_path:
+                    continue
+                thumb_full = os.path.join(settings.THUMBNAIL_DIR, img.thumbnail_path)
+                if not os.path.exists(thumb_full):
+                    continue
+
+                try:
+                    with open(thumb_full, "rb") as f:
+                        thumb_bytes = f.read()
+
+                    resp = client.post(
+                        f"{base}/api/analyze-image",
+                        files={"file": (img.thumbnail_path, thumb_bytes, "image/jpeg")},
+                        data={"context": _FACE_RESCAN_CONTEXT},
+                    )
+                    resp.raise_for_status()
+                    result = resp.json()
+                    desc = (result.get("description") or "").strip()
+
+                    people = _parse_face_descriptions(desc)
+                    for person_desc in people:
+                        face = Face(
+                            image_id=img.id,
+                            description=person_desc,
+                            crop_path=img.thumbnail_path,  # use image thumb as stand-in
+                        )
+                        db.add(face)
+                    if people:
+                        img.face_count = len(people)
+                    db.commit()
+
+                except Exception as exc:
+                    logger.warning("LLM face rescan: failed on image %s: %s", img.id, exc)
+                    with _face_job_lock:
+                        _face_job["errors"] += 1
+
+        logger.info("LLM face rescan: complete, %d images processed", _face_job["done"])
+    except Exception as exc:
+        logger.error("LLM face rescan worker error: %s", exc)
+    finally:
+        db.close()
+        with _face_job_lock:
+            _face_job["running"] = False
+
+
+@router.post("/llm-face-rescan")
+def llm_face_rescan(db: Session = Depends(get_db)):
+    """Clear non-pinned faces and re-detect people in all images via A-Eye LLM."""
+    if not settings.AEYE_URL:
+        raise HTTPException(400, "A-Eye URL is not configured — set it in Settings")
+
+    with _face_job_lock:
+        if _face_job["running"]:
+            return {"queued": 0, "message": "A face job is already running", "status": dict(_face_job)}
+
+    image_ids = [r.id for r in db.query(Image.id).filter(Image.is_video == False).all()]
+    if not image_ids:
+        return {"queued": 0, "message": "No images found"}
+
+    base = settings.AEYE_URL.rstrip("/")
+    t = threading.Thread(target=_run_llm_face_rescan, args=(image_ids, base), daemon=True)
+    t.start()
+
+    return {"queued": len(image_ids), "message": f"LLM face rescan started for {len(image_ids)} images"}
