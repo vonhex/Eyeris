@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { getStats, getScanStatus, startScan, stopScan, startPhashScan, startXmpResync } from "../api"
+import { getSettings, getStats, getScanStatus, startScan, stopScan, startPhashScan, startXmpResync, aeyeAnalyzeUntagged } from "../api"
 import ScanProgress from "../components/ScanProgress"
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [scanJob, setScanJob] = useState(null)
+  const [aeyeUrl, setAeyeUrl] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     getStats().then(setStats).catch(() => null).finally(() => setLoading(false))
     getScanStatus().then(setScanJob).catch(() => {})
+    getSettings().then((s) => setAeyeUrl(s.aeye_url || "")).catch(() => {})
 
     const interval = setInterval(() => {
       getStats().then(setStats).catch(() => {})
@@ -53,6 +55,9 @@ export default function Dashboard() {
 
       {/* XMP tag re-import */}
       <XmpResyncCard scanJob={scanJob} stats={stats} />
+
+      {/* A-Eye integration */}
+      {aeyeUrl && <AeyeCard stats={stats} scanJob={scanJob} />}
 
       {/* Images by folder */}
       {stats && Object.keys(stats.images_by_folder).length > 0 && (
@@ -233,6 +238,60 @@ function XmpResyncCard({ scanJob, stats }) {
           {starting ? "…" : "Re-import XMP"}
         </button>
       </div>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+    </div>
+  )
+}
+
+function AeyeCard({ stats, scanJob }) {
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+
+  const ACTIVE = ["listing", "running", "analyzing", "gpu_rescan", "phash"]
+  const anyScanRunning = ACTIVE.includes(scanJob?.status)
+  const untagged = stats?.untagged_images ?? 0
+
+  const handleSend = async () => {
+    setSending(true)
+    setResult(null)
+    setError(null)
+    try {
+      const r = await aeyeAnalyzeUntagged()
+      setResult(r)
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Failed to send to A-Eye")
+    }
+    setSending(false)
+  }
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-medium text-gray-300">Analyze with A-Eye</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Send untagged images to your A-Eye instance for AI analysis.
+            {untagged > 0 && ` ${untagged.toLocaleString()} untagged image${untagged !== 1 ? "s" : ""} will be sent.`}
+            {untagged === 0 && " No untagged images — all caught up."}
+          </p>
+        </div>
+        <button
+          onClick={handleSend}
+          disabled={sending || anyScanRunning || untagged === 0}
+          title={anyScanRunning ? "A scan is running" : untagged === 0 ? "No untagged images" : undefined}
+          className="text-xs px-3 py-1 rounded bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white transition shrink-0"
+        >
+          {sending ? "Sending…" : "Send to A-Eye"}
+        </button>
+      </div>
+      {result && (
+        <p className="text-xs text-green-400">
+          Sent {result.sent} image{result.sent !== 1 ? "s" : ""} to A-Eye.
+          {result.errors?.length > 0 && ` ${result.errors.length} failed.`}
+          {" "}Use "Re-import XMP Tags" after A-Eye finishes to pull tags back in.
+        </p>
+      )}
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   )

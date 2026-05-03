@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from database import engine, Base
-from routers import images, tags, categories, scan, stats, albums, faces, settings as settings_router, searxng, auth
+from routers import images, tags, categories, scan, stats, albums, faces, settings as settings_router, searxng, auth, aeye
 from services.scanner_service import start_background_scanner
 from services.watcher_service import start_watcher
 from config import settings
@@ -244,7 +244,8 @@ app.add_middleware(
 app.include_router(auth.router)
 
 for _router in [images.router, tags.router, categories.router, scan.router,
-                stats.router, albums.router, faces.router, settings_router.router, searxng.router]:
+                stats.router, albums.router, faces.router, settings_router.router, searxng.router,
+                aeye.router]:
     app.include_router(_router, dependencies=[Depends(_verify_token)])
 
 

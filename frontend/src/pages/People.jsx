@@ -220,6 +220,7 @@ export function PeopleList() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [clustering, setClustering] = useState(false)
+  const [clusterThreshold, setClusterThreshold] = useState(0.82)
   const [error, setError] = useState(null)
   const [tab, setTab] = useState("grouped") // "grouped" | "unknown"
   const [selectMode, setSelectMode] = useState(null) // null | "merge" | "delete"
@@ -241,7 +242,7 @@ export function PeopleList() {
     setClustering(true)
     setError(null)
     try {
-      await clusterFaces()
+      await clusterFaces(clusterThreshold)
       load()
     } catch (err) {
       setError(
@@ -372,13 +373,31 @@ export function PeopleList() {
             </>
           )}
           {!selectMode && (
-            <button
-              onClick={handleCluster}
-              disabled={clustering}
-              className="shrink-0 text-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition"
-            >
-              {clustering ? "Grouping faces..." : clusters.length ? "Re-group Faces" : "Group Faces"}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-col items-end">
+                <select
+                  value={clusterThreshold}
+                  onChange={(e) => setClusterThreshold(parseFloat(e.target.value))}
+                  disabled={clustering}
+                  className="text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded px-2 py-1"
+                  title="Sensitivity: lower = merge more aggressively (fewer groups), higher = keep distinct (more groups)"
+                >
+                  <option value={0.65}>Loose (0.65)</option>
+                  <option value={0.70}>Medium-loose (0.70)</option>
+                  <option value={0.75}>Medium (0.75)</option>
+                  <option value={0.82}>Default (0.82)</option>
+                  <option value={0.88}>Strict (0.88)</option>
+                </select>
+                <span className="text-xs text-gray-600 mt-0.5">grouping sensitivity</span>
+              </div>
+              <button
+                onClick={handleCluster}
+                disabled={clustering}
+                className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition"
+              >
+                {clustering ? "Grouping faces..." : clusters.length ? "Re-group Faces" : "Group Faces"}
+              </button>
+            </div>
           )}
         </div>
       </div>

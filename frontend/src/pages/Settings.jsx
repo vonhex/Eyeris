@@ -38,6 +38,7 @@ export default function Settings() {
         scan_schedule_start: settings.scan_schedule_start || "22:00",
         scan_schedule_end: settings.scan_schedule_end || "06:00",
         searxng_url: settings.searxng_url || "",
+        aeye_url: settings.aeye_url || "",
       }
       if (smbPassword) payload.smb_password = smbPassword
       await updateSettings(payload)
@@ -208,6 +209,19 @@ export default function Settings() {
             <a href="https://github.com/searxng/searxng" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
               What is SearXNG?
             </a>
+          </p>
+        </Field>
+        <Field label="A-Eye URL">
+          <input
+            type="text"
+            value={settings.aeye_url || ""}
+            onChange={(e) => setSettings({ ...settings, aeye_url: e.target.value })}
+            placeholder="http://a-eye:8001"
+            className="input-field"
+          />
+          <p className="text-xs text-gray-600 mt-1">
+            URL of a running A-Eye instance. When set, untagged images can be sent to A-Eye for AI analysis.
+            Both apps must share the same photos volume — A-Eye will write XMP sidecar files which Eyeris can then re-import.
           </p>
         </Field>
       </Section>

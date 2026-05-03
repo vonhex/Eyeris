@@ -60,7 +60,7 @@ def get_stats(db: Session = Depends(get_db)):
     images_by_category = [{"name": name, "count": count} for name, count in cat_counts]
 
     phash_count = db.query(func.count(Image.id)).filter(Image.perceptual_hash.isnot(None)).scalar() or 0
-    untagged_images = db.query(func.count(Image.id)).filter(~Image.tags.any()).scalar() or 0
+    untagged_images = db.query(func.count(Image.id)).filter(~Image.tags.any(), Image.is_video == False).scalar() or 0
 
     dup_count = 0
     if phash_count > 0:

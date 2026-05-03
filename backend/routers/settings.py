@@ -133,6 +133,7 @@ class SettingsResponse(BaseModel):
     scan_schedule_start: str
     scan_schedule_end: str
     searxng_url: str
+    aeye_url: str
 
 
 class SettingsUpdate(BaseModel):
@@ -146,6 +147,7 @@ class SettingsUpdate(BaseModel):
     scan_schedule_start: str | None = None
     scan_schedule_end: str | None = None
     searxng_url: str | None = None
+    aeye_url: str | None = None
 
 
 @router.get("", response_model=SettingsResponse)
@@ -160,6 +162,7 @@ def get_settings():
         scan_schedule_start=settings.SCAN_SCHEDULE_START,
         scan_schedule_end=settings.SCAN_SCHEDULE_END,
         searxng_url=settings.SEARXNG_URL,
+        aeye_url=settings.AEYE_URL,
     )
 
 
@@ -218,6 +221,11 @@ def update_settings(body: SettingsUpdate):
         env["SEARXNG_URL"] = body.searxng_url
         settings.SEARXNG_URL = body.searxng_url
         changed.append("SEARXNG_URL")
+
+    if body.aeye_url is not None:
+        env["AEYE_URL"] = body.aeye_url
+        settings.AEYE_URL = body.aeye_url
+        changed.append("AEYE_URL")
 
     _write_env(env)
     _save_settings_json(env)
