@@ -8,12 +8,13 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 ENV_PATH = os.path.join(os.path.dirname(__file__), '..', '..', '.env')
 
-# Keys persisted to the JSON backup store (everything except auth secrets)
+# Keys persisted to the JSON backup store in the /data/db volume
 _JSON_KEYS = [
     "SMB_HOST", "SMB_USERNAME", "SMB_PASSWORD", "SMB_SHARES",
     "SCAN_CONCURRENCY", "SCAN_INTERVAL_MINUTES",
     "SCAN_SCHEDULE_ENABLED", "SCAN_SCHEDULE_START", "SCAN_SCHEDULE_END",
     "SEARXNG_URL",
+    "AEYE_URL", "AEYE_USER", "AEYE_PASS",
 ]
 
 
