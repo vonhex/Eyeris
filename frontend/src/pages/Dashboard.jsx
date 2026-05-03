@@ -250,7 +250,7 @@ function AeyeCard({ stats, scanJob }) {
 
   const ACTIVE = ["listing", "running", "analyzing", "gpu_rescan", "phash"]
   const anyScanRunning = ACTIVE.includes(scanJob?.status)
-  const untagged = stats?.untagged_images ?? 0
+  const untagged = (stats?.untagged_images ?? 0) + (stats?.untagged_videos ?? 0)
 
   const handleSend = async () => {
     setSending(true)
@@ -271,9 +271,9 @@ function AeyeCard({ stats, scanJob }) {
         <div>
           <h3 className="text-sm font-medium text-gray-300">Analyze with A-Eye</h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            Send untagged images to your A-Eye instance for AI analysis.
-            {untagged > 0 && ` ${untagged.toLocaleString()} untagged image${untagged !== 1 ? "s" : ""} will be sent.`}
-            {untagged === 0 && " No untagged images — all caught up."}
+            Send untagged images and videos to your A-Eye instance for AI analysis.
+            {untagged > 0 && ` ${untagged.toLocaleString()} untagged item${untagged !== 1 ? "s" : ""} will be sent.`}
+            {untagged === 0 && " No untagged items — all caught up."}
           </p>
         </div>
         <button

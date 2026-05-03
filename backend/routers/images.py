@@ -75,7 +75,7 @@ def list_images(
     quality_issue: str | None = None,  # "blur" | "overexposed" | "underexposed" | "any"
     has_gps: bool | None = None,
     untagged: bool | None = None,
-    is_video: bool = Query(False),
+    is_video: bool | None = Query(None),
     sort: str | None = Query(None, pattern="^(date_taken|date_added|filename)_(asc|desc)$|^random$"),
     db: Session = Depends(get_db),
 ):
@@ -90,7 +90,7 @@ def list_images(
                 page=page, page_size=page_size,
                 analyzed_only=analyzed_only,
                 favorite=favorite,
-                is_video=is_video,
+                is_video=is_video if is_video is not None else False,
             )
             if result["ids"]:
                 images = (
@@ -127,8 +127,13 @@ def list_images(
         id_query = id_query.filter(Image.analyzed == True)
     if favorite is not None:
         id_query = id_query.filter(Image.favorite == favorite)
-    
-    id_query = id_query.filter(Image.is_video == is_video)
+
+    # When filtering untagged without an explicit is_video, show all media types.
+    # Otherwise default to images only (is_video=False).
+    if is_video is not None:
+        id_query = id_query.filter(Image.is_video == is_video)
+    elif not untagged:
+        id_query = id_query.filter(Image.is_video == False)
 
     if date_from:
         id_query = id_query.filter(Image.date_taken >= date_from)
@@ -242,7 +247,7 @@ def list_image_ids(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     untagged: bool | None = None,
-    is_video: bool = Query(False),
+    is_video: bool | None = Query(None),
     db: Session = Depends(get_db),
 ):
     """Return all image IDs matching the current filters (no pagination). Used for Select All."""
@@ -254,8 +259,11 @@ def list_image_ids(
             q = q.filter(Image.source_folder == folder)
     if favorite is not None:
         q = q.filter(Image.favorite == favorite)
-    
-    q = q.filter(Image.is_video == is_video)
+
+    if is_video is not None:
+        q = q.filter(Image.is_video == is_video)
+    elif not untagged:
+        q = q.filter(Image.is_video == False)
 
     if date_from:
         q = q.filter(Image.date_taken >= date_from)

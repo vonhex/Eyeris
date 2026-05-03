@@ -127,6 +127,7 @@ class StatsOut(BaseModel):
     phash_count: int = 0
     duplicate_groups: int = 0
     untagged_images: int = 0
+    untagged_videos: int = 0
 
 
 # --- Request bodies ---

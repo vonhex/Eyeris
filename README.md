@@ -56,6 +56,7 @@ Open **http://localhost:8000** — default username is `eyeris`, password is set
 - Filter by tag, category, album, folder, camera, location, date range, GPS, or quality issue
 - Sort by date taken, date added, filename, or random
 - Video support (MP4, MKV, MOV, AVI, WebM and more) with thumbnail preview
+- **Untagged view** shows both images and videos with no tags yet
 
 ### Image Viewer
 - **Desktop:** mouse-wheel zoom (up to 8×), click-drag to pan, double-click to toggle zoom, keyboard ← → to navigate
@@ -65,7 +66,15 @@ Open **http://localhost:8000** — default username is `eyeris`, password is set
 ### AI Analysis
 - **SigLIP** zero-shot tag classification against ~300 candidates — runs locally on GPU during scan
 - **YOLOv8 + FaceNet** face detection and 512-d embeddings for People clustering
-- **XMP sidecar ingestion**: tags and descriptions written by external tools (e.g. A-EYE) are read automatically during scan
+- **XMP sidecar ingestion**: tags and descriptions written by external tools are read automatically during scan
+
+### A-Eye Integration
+- Connect to a self-hosted [A-Eye](https://github.com/vonhex/a-eye) instance from the Settings page
+- **Send untagged images and videos to A-Eye** for AI analysis with one click from the Dashboard
+- Video thumbnails are sent automatically when a video has no tags
+- Tags and descriptions written by A-Eye are **auto-imported every 5 minutes** — no manual re-import needed
+- Supports HTTP Basic Auth for protected A-Eye instances
+- A-Eye URL, username, and password persist across container updates
 
 ### Metadata & EXIF
 - Date taken, GPS location with OpenStreetMap link, reverse-geocoded city/country
@@ -74,13 +83,14 @@ Open **http://localhost:8000** — default username is `eyeris`, password is set
 ### Organisation
 - Tag editor per image + bulk tag editor across selections
 - Category and album assignment
-- People page: face clusters with optional name labels
+- **People page**: face clusters with optional name labels and adjustable sensitivity slider (Loose → Strict)
 - Duplicate detection via perceptual hash
 
 ### System
 - Two-phase async scan pipeline with live progress bar
 - File-watcher for near-real-time new image detection
-- Settings page with runtime `.env` editing
+- Settings page with runtime `.env` editing — all settings survive container recreation
+- Dashboard shows accurate untagged counts for both images and videos
 
 ---
 
