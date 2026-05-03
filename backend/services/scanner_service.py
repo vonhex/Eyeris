@@ -649,13 +649,13 @@ async def run_xmp_resync() -> int:
         db.refresh(job)
         _current_job_id = job.id
 
-        images = db.query(Image).all()
+        images = db.query(Image).filter(~Image.tags.any(), Image.is_video == False).all()
         total = len(images)
         job.phase1_total = total
         job.total_images = total
         db.commit()
 
-        print(f"[XMP Resync] Re-reading XMP sidecars for {total} images...")
+        print(f"[XMP Resync] Re-reading XMP sidecars for {total} untagged images...")
         done = 0
         for img_record in images:
             if _stop_requested:

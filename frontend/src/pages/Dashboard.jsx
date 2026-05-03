@@ -285,12 +285,18 @@ function AeyeCard({ stats, scanJob }) {
           {sending ? "Sending…" : "Send to A-Eye"}
         </button>
       </div>
-      {result && (
+      {result && result.sent > 0 && (
         <p className="text-xs text-green-400">
           Sent {result.sent} image{result.sent !== 1 ? "s" : ""} to A-Eye.
           {result.errors?.length > 0 && ` ${result.errors.length} failed.`}
           {" "}Use "Re-import XMP Tags" after A-Eye finishes to pull tags back in.
         </p>
+      )}
+      {result && result.sent === 0 && result.errors?.length > 0 && (
+        <div className="text-xs text-red-400 space-y-1">
+          <p>All {result.errors.length} failed. First error: {result.errors[0]?.error}</p>
+          <p className="text-gray-600">Check that the A-Eye URL is reachable and that both apps share the same photos volume.</p>
+        </div>
       )}
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
