@@ -264,24 +264,27 @@ export function PeopleList() {
 
   useEffect(() => { load() }, [])
 
-  // Poll face-describe status while a job is running
+  // Poll face-describe/LLM-rescan job status — starts on mount so navigating
+  // away and back still shows a running job.
   useEffect(() => {
-    if (describeJob?.running) {
-      describePollerRef.current = setInterval(async () => {
-        try {
-          const status = await aeyeFaceDescribeStatus()
-          setDescribeJob(status)
-          if (!status.running) {
-            clearInterval(describePollerRef.current)
-            setDescribing(false)
-            setLlmRescanRunning(false)
-            load()
-          }
-        } catch (_) {}
-      }, 3000)
+    const poll = async () => {
+      try {
+        const status = await aeyeFaceDescribeStatus()
+        setDescribeJob(status)
+        if (status.running) {
+          // Keep flags in sync if job was already running before mount
+          if (status.total > 0 && status.done < status.total) setLlmRescanRunning(true)
+        } else {
+          setDescribing(false)
+          setLlmRescanRunning(false)
+        }
+      } catch (_) {}
     }
+
+    poll() // check immediately on mount
+    describePollerRef.current = setInterval(poll, 3000)
     return () => clearInterval(describePollerRef.current)
-  }, [describeJob?.running])
+  }, [])
 
   const handleCluster = async () => {
     setClustering(true)
@@ -530,6 +533,23 @@ export function PeopleList() {
       {selectMode === "delete" && (
         <div className="mb-4 px-4 py-2 bg-red-900/20 border border-red-800/40 rounded text-sm text-red-300">
           Select groups to delete. Deleted faces are hidden and won't be re-grouped on future scans.
+        </div>
+      )}
+
+      {/* A-Eye job progress bar — visible whenever a job is running, survives navigation */}
+      {describeJob?.running && (
+        <div className="mb-4 bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-2">
+          <div className="flex justify-between text-xs text-gray-400">
+            <span>{llmRescanRunning ? "LLM face rescan…" : "Describing faces with A-Eye…"}</span>
+            <span>{describeJob.done?.toLocaleString()} / {describeJob.total?.toLocaleString()} ({describeJob.total > 0 ? Math.round((describeJob.done / describeJob.total) * 100) : 0}%)</span>
+          </div>
+          <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+            <div
+              className="h-2 rounded-full bg-purple-500 transition-all duration-500"
+              style={{ width: describeJob.total > 0 ? `${Math.round((describeJob.done / describeJob.total) * 100)}%` : "0%" }}
+            />
+          </div>
+          {describeJob.errors > 0 && <p className="text-xs text-yellow-500">{describeJob.errors} failed</p>}
         </div>
       )}
 
