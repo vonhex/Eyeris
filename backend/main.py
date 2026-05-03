@@ -20,7 +20,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from database import engine, Base
 from routers import images, tags, categories, scan, stats, albums, faces, settings as settings_router, searxng, auth, aeye
-from services.scanner_service import start_background_scanner
+from services.scanner_service import start_background_scanner, start_aeye_xmp_poll
 from services.watcher_service import start_watcher
 from config import settings
 
@@ -218,6 +218,8 @@ async def lifespan(app_instance: FastAPI):
     print("[Startup] Background scanner started")
     await start_watcher()
     print("[Startup] File watcher started")
+    await start_aeye_xmp_poll()
+    print("[Startup] A-Eye XMP poll loop started")
     yield
     # Shutdown
     print("[Shutdown] App shutting down")

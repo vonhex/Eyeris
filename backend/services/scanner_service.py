@@ -101,6 +101,65 @@ def request_resume():
         print("[Scanner] Resumed")
 
 
+_aeye_poll_task: asyncio.Task | None = None
+_AEYE_POLL_INTERVAL = 300  # seconds between XMP sidecar checks
+
+
+async def start_aeye_xmp_poll():
+    """Start the silent background loop that auto-imports XMP sidecars written by A-Eye."""
+    global _aeye_poll_task
+    if _aeye_poll_task and not _aeye_poll_task.done():
+        return
+    _aeye_poll_task = asyncio.create_task(_aeye_xmp_poll_loop())
+
+
+async def _aeye_xmp_poll_loop():
+    """Every 5 minutes, quietly check untagged images for XMP sidecars written by A-Eye.
+
+    Runs silently — no ScanJob is created, no UI progress shown.
+    Only active when AEYE_URL is configured.
+    """
+    while True:
+        await asyncio.sleep(_AEYE_POLL_INTERVAL)
+        if not settings.AEYE_URL:
+            continue
+        db = SessionLocal()
+        try:
+            images = (
+                db.query(Image)
+                .filter(~Image.tags.any(), Image.is_video == False)
+                .all()
+            )
+            if not images:
+                db.close()
+                continue
+
+            imported = 0
+            for img in images:
+                tags_before = len(img.tags)
+                try:
+                    await _load_xmp_for_image(db, img)
+                    db.flush()
+                    if len(img.tags) > tags_before:
+                        imported += 1
+                except Exception as e:
+                    print(f"[A-Eye Poll] XMP check error for {img.file_path}: {e}")
+
+            if imported:
+                db.commit()
+                print(f"[A-Eye Poll] Auto-imported XMP tags for {imported} image(s)")
+            else:
+                db.rollback()
+        except Exception as e:
+            print(f"[A-Eye Poll] Loop error: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+        finally:
+            db.close()
+
+
 async def start_background_scanner():
     """Start the periodic background scanning loop (called on app startup)."""
     global _scanner_task, _user_stopped, _paused
