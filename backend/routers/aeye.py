@@ -1,12 +1,16 @@
+import logging
 import os
+import threading
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from config import settings
-from database import get_db
+from database import get_db, SessionLocal
 from models import Image, Tag, ImageTag
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/aeye", tags=["aeye"])
 
@@ -109,31 +113,47 @@ def analyze_images(body: dict, db: Session = Depends(get_db)):
     return {"sent": sent, "errors": errors}
 
 
+def _run_analyze_untagged(image_ids: list[int], base: str) -> None:
+    """Background worker: send untagged images/videos to A-Eye. Runs in a thread."""
+    db = SessionLocal()
+    try:
+        images = db.query(Image).filter(Image.id.in_(image_ids)).all()
+        sent = 0
+        with _aeye_client() as client:
+            for img in images:
+                try:
+                    if img.is_video:
+                        _send_thumbnail(client, img, base, db)
+                    else:
+                        rel = _aeye_path(img.file_path)
+                        resp = client.post(f"{base}/api/analyze-path", json={"path": rel})
+                        resp.raise_for_status()
+                    sent += 1
+                except Exception as exc:
+                    logger.warning("A-Eye: failed on image %s: %s", img.id, exc)
+        db.commit()
+        logger.info("A-Eye: sent %d / %d items", sent, len(images))
+    except Exception as exc:
+        logger.error("A-Eye background worker error: %s", exc)
+    finally:
+        db.close()
+
+
 @router.post("/analyze-untagged")
 def analyze_untagged(db: Session = Depends(get_db)):
-    """Send all untagged images and videos to A-Eye for AI analysis."""
+    """Queue all untagged images and videos for A-Eye analysis and return immediately."""
     if not settings.AEYE_URL:
         raise HTTPException(400, "A-Eye URL is not configured — set it in Settings")
 
     images = db.query(Image).filter(~Image.tags.any()).all()
 
     if not images:
-        return {"sent": 0, "errors": [], "message": "No untagged images found"}
+        return {"queued": 0, "message": "No untagged items found"}
 
+    image_ids = [img.id for img in images]
     base = settings.AEYE_URL.rstrip("/")
-    sent, errors = 0, []
-    with _aeye_client() as client:
-        for img in images:
-            try:
-                if img.is_video:
-                    _send_thumbnail(client, img, base, db)
-                else:
-                    rel = _aeye_path(img.file_path)
-                    resp = client.post(f"{base}/api/analyze-path", json={"path": rel})
-                    resp.raise_for_status()
-                sent += 1
-            except Exception as exc:
-                errors.append({"id": img.id, "error": str(exc)})
 
-    db.commit()
-    return {"sent": sent, "total": len(images), "errors": errors}
+    t = threading.Thread(target=_run_analyze_untagged, args=(image_ids, base), daemon=True)
+    t.start()
+
+    return {"queued": len(image_ids), "message": f"Sending {len(image_ids)} items to A-Eye in the background"}

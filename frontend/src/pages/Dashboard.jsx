@@ -285,18 +285,13 @@ function AeyeCard({ stats, scanJob }) {
           {sending ? "Sending…" : "Send to A-Eye"}
         </button>
       </div>
-      {result && result.sent > 0 && (
+      {result && result.queued > 0 && (
         <p className="text-xs text-green-400">
-          Sent {result.sent} image{result.sent !== 1 ? "s" : ""} to A-Eye.
-          {result.errors?.length > 0 && ` ${result.errors.length} failed.`}
-          {" "}Use "Re-import XMP Tags" after A-Eye finishes to pull tags back in.
+          Queued {result.queued} item{result.queued !== 1 ? "s" : ""} — A-Eye is analysing in the background. Tags will auto-import within a few minutes.
         </p>
       )}
-      {result && result.sent === 0 && result.errors?.length > 0 && (
-        <div className="text-xs text-red-400 space-y-1">
-          <p>All {result.errors.length} failed. First error: {result.errors[0]?.error}</p>
-          <p className="text-gray-600">Check that the A-Eye URL is reachable and that both apps share the same photos volume.</p>
-        </div>
+      {result && result.queued === 0 && (
+        <p className="text-xs text-gray-500">No untagged items found.</p>
       )}
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
