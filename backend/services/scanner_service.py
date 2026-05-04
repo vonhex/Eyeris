@@ -144,6 +144,10 @@ async def _aeye_xmp_poll_loop():
                         imported += 1
                 except Exception as e:
                     print(f"[A-Eye Poll] XMP check error for {img.file_path}: {e}")
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
 
             if imported:
                 db.commit()

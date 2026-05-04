@@ -149,12 +149,10 @@ def _run_analyze_untagged(image_ids: list[int], base: str) -> None:
                 with _job_lock:
                     _job["current"] = img.filename or str(img.id)
                 try:
-                    if img.is_video:
-                        _send_thumbnail(client, img, base, db)
-                    else:
-                        rel = _aeye_path(img.file_path)
-                        resp = client.post(f"{base}/api/analyze-path", json={"path": rel})
-                        resp.raise_for_status()
+                    # Always use /analyze-image (thumbnail bytes) so A-Eye returns tags
+                    # synchronously. /analyze-path only enqueues in A-Eye's own pipeline
+                    # and never sends results back to Eyeris.
+                    _send_thumbnail(client, img, base, db)
                     # commit each item so results appear immediately
                     db.commit()
                     with _job_lock:
