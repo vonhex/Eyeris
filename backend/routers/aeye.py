@@ -292,52 +292,57 @@ def describe_faces(db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# LLM face rescan — replace YOLO/FaceNet with A-Eye descriptions
+# LLM face rescan — use A-Eye's /analyze-faces endpoint (bypasses template)
 # ---------------------------------------------------------------------------
 
-_FACE_RESCAN_CONTEXT = (
-    "Focus only on the people in this image. "
-    "For each distinct person, describe them on a separate line as: "
-    "'Person N: <gender>, <age range>, <hair color and length>, <notable features like glasses/beard>'. "
-    "Example: 'Person 1: woman, 30s, long brown hair, glasses'. "
-    "If there are no people, reply with exactly: no people."
-)
-
-_NO_PEOPLE_PHRASES = {
-    "no people", "no person", "no human", "nobody", "no one",
-    "no faces", "no face", "no individuals", "empty",
-}
+_JACCARD_THRESHOLD = 0.40  # word-overlap to consider two descriptions the same person
 
 
-def _parse_face_descriptions(description: str) -> list[str]:
-    """Return a list of per-person description strings from the LLM output."""
-    import re
-    lines = [l.strip() for l in description.splitlines() if l.strip()]
-    if not lines:
-        return []
+def _jaccard(a: str, b: str) -> float:
+    wa = set(a.lower().split())
+    wb = set(b.lower().split())
+    if not wa or not wb:
+        return 0.0
+    return len(wa & wb) / len(wa | wb)
 
-    # Check if the model said there are no people
-    combined = " ".join(lines).lower().strip(".").strip()
-    if any(phrase in combined for phrase in _NO_PEOPLE_PHRASES):
-        return []
 
-    # Try to find "Person N: ..." lines
-    person_lines = [l for l in lines if re.match(r"(?i)^person\s*\d+\s*:", l)]
-    if person_lines:
-        return [re.sub(r"(?i)^person\s*\d+\s*:\s*", "", l).strip() for l in person_lines]
+def _cluster_descriptions(faces: list) -> list:
+    """Assign cluster_ids to Face objects by Jaccard word-overlap on descriptions.
 
-    # Fallback: if the description is short and mentions a person, treat as single face
-    lower = combined.lower()
-    if any(w in lower for w in ("woman", "man", "person", "girl", "boy", "child", "adult", "face")):
-        return [combined]
+    Modifies Face.cluster_id in-place and returns the list.
+    Uses a simple greedy union-find: each face joins the first existing cluster
+    whose representative description exceeds the threshold.
+    """
+    # (cluster_id, representative_description)
+    clusters: list[tuple[int, str]] = []
+    next_id = 1
 
-    return []
+    for face in faces:
+        desc = (face.description or "").strip()
+        if not desc:
+            face.cluster_id = next_id
+            clusters.append((next_id, desc))
+            next_id += 1
+            continue
+
+        matched = None
+        for cid, rep in clusters:
+            if _jaccard(desc, rep) >= _JACCARD_THRESHOLD:
+                matched = cid
+                break
+
+        if matched is not None:
+            face.cluster_id = matched
+        else:
+            face.cluster_id = next_id
+            clusters.append((next_id, desc))
+            next_id += 1
+
+    return faces
 
 
 def _run_llm_face_rescan(image_ids: list[int], base: str) -> None:
-    """Background worker: LLM-based face detection via A-Eye on full image thumbnails."""
-    import json as _json
-
+    """Background worker: LLM-based face detection via A-Eye /analyze-faces."""
     with _face_job_lock:
         _face_job.update({"running": True, "total": len(image_ids), "done": 0, "errors": 0})
 
@@ -349,6 +354,7 @@ def _run_llm_face_rescan(image_ids: list[int], base: str) -> None:
         logger.info("LLM face rescan: cleared non-pinned faces, processing %d images", len(image_ids))
 
         images = db.query(Image).filter(Image.id.in_(image_ids), Image.is_video == False).all()
+        new_faces: list[Face] = []
 
         with _aeye_client() as client:
             for img in images:
@@ -366,32 +372,48 @@ def _run_llm_face_rescan(image_ids: list[int], base: str) -> None:
                         thumb_bytes = f.read()
 
                     resp = client.post(
-                        f"{base}/api/analyze-image",
+                        f"{base}/api/analyze-faces",
                         files={"file": (img.thumbnail_path, thumb_bytes, "image/jpeg")},
-                        data={"context": _FACE_RESCAN_CONTEXT},
                     )
                     resp.raise_for_status()
                     result = resp.json()
-                    desc = (result.get("description") or "").strip()
+                    face_list = result.get("faces") or []
 
-                    people = _parse_face_descriptions(desc)
-                    for person_desc in people:
+                    for entry in face_list:
+                        desc = (entry.get("description") or "").strip()
+                        if not desc:
+                            continue
                         face = Face(
                             image_id=img.id,
-                            description=person_desc,
-                            crop_path=img.thumbnail_path,  # use image thumb as stand-in
+                            description=desc,
+                            crop_path=img.thumbnail_path,
                         )
                         db.add(face)
-                    if people:
-                        img.face_count = len(people)
-                    db.commit()
+                        new_faces.append(face)
+
+                    if face_list:
+                        img.face_count = len(face_list)
+                    db.flush()
 
                 except Exception as exc:
                     logger.warning("LLM face rescan: failed on image %s: %s", img.id, exc)
                     with _face_job_lock:
                         _face_job["errors"] += 1
 
-        logger.info("LLM face rescan: complete, %d images processed", _face_job["done"])
+        # Flush so all new Face rows get IDs, then cluster by description similarity
+        db.flush()
+        if new_faces:
+            # Offset cluster IDs above any pinned clusters
+            from sqlalchemy import func as _func
+            pinned_max = db.query(_func.max(Face.cluster_id)).filter(Face.pinned == True).scalar() or 0
+            _cluster_descriptions(new_faces)
+            for face in new_faces:
+                if face.cluster_id is not None:
+                    face.cluster_id += pinned_max
+
+        db.commit()
+        logger.info("LLM face rescan: complete — %d faces found across %d images",
+                    len(new_faces), _face_job["done"])
     except Exception as exc:
         logger.error("LLM face rescan worker error: %s", exc)
     finally:
