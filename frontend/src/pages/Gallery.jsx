@@ -18,8 +18,6 @@ export default function Gallery() {
   const category = searchParams.get("category") || null
   const search = searchParams.get("search") || ""
   const sort = searchParams.get("sort") || "date_taken_desc"
-  const clusterIdParam = searchParams.get("cluster_id")
-  const cluster_id = clusterIdParam !== null ? parseInt(clusterIdParam, 10) : null
   const favoriteParam = searchParams.get("favorite")
   const favorite = favoriteParam === "true" ? true : null
   const date_from = searchParams.get("date_from") || null
@@ -31,8 +29,8 @@ export default function Gallery() {
   const untagged = searchParams.get("untagged") === "true" ? true : null
   const is_video = searchParams.get("is_video") === "true" ? true : null
 
-  const filters = { folder, tag, category, search, cluster_id, favorite, date_from, date_to, location, camera, quality_issue, has_gps, untagged, is_video }
-  const filtersKey = JSON.stringify({ folder, tag, category, search, sort, cluster_id, favorite, date_from, date_to, location, camera, quality_issue, has_gps, untagged, is_video })
+  const filters = { folder, tag, category, search, favorite, date_from, date_to, location, camera, quality_issue, has_gps, untagged, is_video }
+  const filtersKey = JSON.stringify({ folder, tag, category, search, sort, favorite, date_from, date_to, location, camera, quality_issue, has_gps, untagged, is_video })
 
   const [images, setImages] = useState([])
   const [total, setTotal] = useState(0)
@@ -92,7 +90,6 @@ export default function Gallery() {
         if (tag) activeFilters.tag = tag
         if (category) activeFilters.category = category
         if (search) activeFilters.search = search
-        if (cluster_id !== null) activeFilters.cluster_id = cluster_id
         if (favorite) activeFilters.favorite = favorite
         if (date_from) activeFilters.date_from = date_from
         if (date_to) activeFilters.date_to = date_to
@@ -106,7 +103,7 @@ export default function Gallery() {
     }
     document.addEventListener("click", handleClick)
     return () => document.removeEventListener("click", handleClick)
-  }, [images, total, folder, tag, category, search, sort, cluster_id, favorite, date_from, date_to])
+  }, [images, total, folder, tag, category, search, sort, favorite, date_from, date_to])
 
   const fetchRef = useRef(0)
   useEffect(() => {
@@ -119,7 +116,6 @@ export default function Gallery() {
         if (tag) params.tag = tag
         if (category) params.category = category
         if (search) params.search = search
-        if (cluster_id !== null) params.cluster_id = cluster_id
         if (favorite) params.favorite = true
         if (date_from) params.date_from = date_from
         if (date_to) params.date_to = date_to
@@ -225,7 +221,6 @@ export default function Gallery() {
     if (tag) params.tag = tag
     if (category) params.category = category
     if (search) params.search = search
-    if (cluster_id !== null) params.cluster_id = cluster_id
     if (favorite) params.favorite = true
     if (date_from) params.date_from = date_from
     if (date_to) params.date_to = date_to

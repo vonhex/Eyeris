@@ -24,7 +24,6 @@ function ScrollToTopButton() {
 import Gallery from "./pages/Gallery"
 import ImageDetail from "./pages/ImageDetail"
 import Dashboard from "./pages/Dashboard"
-import PeopleList from "./pages/People"
 import Tags from "./pages/Tags"
 import Folders from "./pages/Folders"
 import Settings from "./pages/Settings"
@@ -38,7 +37,6 @@ const navItems = [
   { to: "/?favorite=true", label: "Favorites", end: false, exact: false },
   { to: "/?is_video=true", label: "Videos", end: false },
   { to: "/?untagged=true", label: "Untagged", end: false },
-  { to: "/people", label: "People" },
   { to: "/tags", label: "Tags" },
   { to: "/folders", label: "Folders" },
   { to: "/duplicates", label: "Duplicates" },
@@ -202,7 +200,6 @@ function MainApp() {
           <Routes>
             <Route path="/" element={<Gallery />} />
             <Route path="/image/:id" element={<ImageDetail />} />
-            <Route path="/people" element={<PeopleList />} />
             <Route path="/tags" element={<Tags />} />
             <Route path="/folders" element={<Folders />} />
             <Route path="/dashboard" element={<Dashboard />} />

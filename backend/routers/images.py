@@ -66,7 +66,6 @@ def list_images(
     category: str | None = None,
     search: str | None = None,
     analyzed_only: bool = False,
-    cluster_id: int | None = None,
     favorite: bool | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -149,9 +148,6 @@ def list_images(
         id_query = id_query.join(Image.tags).join(ImageTag.tag).filter(Tag.name == tag.lower())
     if category:
         id_query = id_query.join(Image.categories).join(ImageCategory.category).filter(Category.name == category)
-    if cluster_id is not None:
-        person_img_ids = db.query(Face.image_id).filter(Face.cluster_id == cluster_id).subquery()
-        id_query = id_query.filter(Image.id.in_(db.query(person_img_ids.c.image_id)))
     if location:
         id_query = id_query.filter(Image.location_name.ilike(f"%{location}%"))
     if camera:
@@ -242,7 +238,6 @@ def list_image_ids(
     tag: str | None = None,
     category: str | None = None,
     search: str | None = None,
-    cluster_id: int | None = None,
     favorite: bool | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -279,9 +274,6 @@ def list_image_ids(
         q = q.join(Image.tags).join(ImageTag.tag).filter(Tag.name == tag.lower())
     if category:
         q = q.join(Image.categories).join(ImageCategory.category).filter(Category.name == category)
-    if cluster_id is not None:
-        person_img_ids = db.query(Face.image_id).filter(Face.cluster_id == cluster_id).subquery()
-        q = q.filter(Image.id.in_(db.query(person_img_ids.c.image_id)))
     if untagged:
         q = q.filter(~Image.tags.any())
     ids = [row[0] for row in q.distinct().all()]

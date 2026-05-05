@@ -97,7 +97,7 @@ async def lifespan(app_instance: FastAPI):
             if "crop_path" not in face_cols:
                 conn.execute(text("ALTER TABLE faces ADD COLUMN crop_path VARCHAR(512) NULL"))
                 print("[Startup] Added faces.crop_path")
-            # Add missing indexes (speeds up People page cluster queries)
+            # Add missing indexes
             face_indexes = {idx["name"] for idx in inspector.get_indexes("faces")}
             if "ignored" not in face_cols:
                 conn.execute(text("ALTER TABLE faces ADD COLUMN ignored TINYINT(1) NOT NULL DEFAULT 0"))

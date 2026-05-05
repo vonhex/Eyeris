@@ -65,7 +65,7 @@ Open **http://localhost:8000** — default username is `eyeris`, password is set
 
 ### AI Analysis
 - **SigLIP** zero-shot tag classification against ~300 candidates — runs locally on GPU during scan
-- **YOLOv8 + FaceNet** face detection and 512-d embeddings for People clustering
+- **YOLOv8 + FaceNet** face detection and bounding-box metadata per image
 - **XMP sidecar ingestion**: tags and descriptions written by external tools are read automatically during scan
 
 ### A-Eye Integration
@@ -83,7 +83,6 @@ Open **http://localhost:8000** — default username is `eyeris`, password is set
 ### Organisation
 - Tag editor per image + bulk tag editor across selections
 - Category and album assignment
-- **People page**: face clusters with optional name labels and adjustable sensitivity slider (Loose → Strict)
 - Duplicate detection via perceptual hash
 
 ### System
