@@ -120,7 +120,7 @@ function DuplicateScanCard({ scanJob, stats, onNavigate }) {
   const [error, setError] = useState(null)
 
   const isPhash = scanJob?.status === "phash"
-  const ACTIVE = ["listing", "running", "analyzing", "gpu_rescan", "phash"]
+  const ACTIVE = ["listing", "running", "analyzing", "phash"]
   const anyScanRunning = ACTIVE.includes(scanJob?.status)
 
   const hashed = stats?.phash_count ?? null
@@ -204,7 +204,7 @@ function XmpResyncCard({ scanJob, stats }) {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState(null)
 
-  const ACTIVE = ["listing", "running", "analyzing", "gpu_rescan", "phash"]
+  const ACTIVE = ["listing", "running", "analyzing", "phash"]
   const anyScanRunning = ACTIVE.includes(scanJob?.status)
   const untagged = stats?.untagged_images ?? null
 

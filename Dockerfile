@@ -1,11 +1,11 @@
 # ============================================================
-# Eyeris — AI-Powered Photo Organizer
+# Eyeris — Self-hosted Photo Manager
 # Your Pictures. Fast. Easy. Simple.
 # ============================================================
 #
 # Multi-stage build:
 #   Stage 1: frontend-build    — Node.js, builds the React SPA
-#   Stage 2: backend-runtime   — Python (CPU PyTorch + minimal NVIDIA libs)
+#   Stage 2: backend-runtime   — Python (no GPU/CUDA required)
 # ============================================================
 
 # ── Stage 1: Frontend build ──────────────────────────────────────────
@@ -22,42 +22,24 @@ RUN npm run build
 FROM python:3.12-slim AS backend-runtime
 
 LABEL org.opencontainers.image.source="https://github.com/vonhex/Eyeris" \
-      org.opencontainers.image.description="Eyeris — AI-Powered Photo Organizer" \
+      org.opencontainers.image.description="Eyeris — Self-hosted Photo Manager" \
       maintainer="vonhex"
-
-# NVIDIA toolkit (for GPU access at runtime via nvidia-container-toolkit)
-ENV NVIDIA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         file \
-        cmake \
         libmagic1 \
         libgomp1 \
         libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /tmp/* \
-    && groupadd -f -g 44 video \
-    && groupadd -f -g 104 render
+    && rm -rf /tmp/*
 
 # Python deps
 WORKDIR /app/backend
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir \
-        numpy opencv-python-headless \
-        nvidia-cublas-cu12 nvidia-cudnn-cu12 \
-    && pip uninstall -y nvidia-nccl-cu12 2>/dev/null || true \
-    && rm -rf \
-           /usr/local/lib/python3.12/site-packages/cusparselt \
-           /usr/local/lib/python3.12/site-packages/triton \
-           /usr/local/lib/python3.12/site-packages/_polars_runtime_32 \
-           /usr/local/lib/python3.12/site-packages/torch/include \
-           /usr/local/lib/python3.12/site-packages/torch/test \
-           /usr/local/lib/python3.12/site-packages/torch/share/doc \
-           /usr/local/lib/python3.12/site-packages/torch/utils/benchmark \
+    && pip install --no-cache-dir numpy opencv-python-headless \
     && find /usr/local/lib/python3.12/site-packages/ -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
 # Backend source + pre-built frontend
@@ -72,13 +54,10 @@ ENV PYTHONUNBUFFERED=1 \
     TZ=Etc/UTC \
     THUMBNAIL_DIR=/data/thumbnails \
     DB_PATH=/data/db/images.db \
-    MOUNT_BASE=/data/images \
-    YOLO_CONFIG_DIR=/data/thumbnails/.yolo \
-    HF_HOME=/data/thumbnails/.hf_cache
+    MOUNT_BASE=/data/images
 
 EXPOSE 8000
 
-# Volume mounts
 VOLUME ["/data/images", "/data/thumbnails", "/data/db"]
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1

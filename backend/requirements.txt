@@ -8,12 +8,6 @@ Pillow
 httpx
 python-dotenv
 python-multipart
-torch
-torchvision
-ultralytics
-facenet-pytorch
-huggingface_hub
-scipy
 reverse_geocode
 watchfiles
 imagehash

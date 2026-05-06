@@ -67,9 +67,9 @@ async def start_scan():
     return {"status": "ok", "message": "Scan started"}
 
 
-@router.post("/gpu-rescan")
-async def gpu_rescan():
-    """Trigger a full re-sync of all image metadata and XMP tags."""
+@router.post("/resync")
+async def resync():
+    """Trigger a full re-sync of all image metadata, XMP tags, and missing thumbnails."""
     if is_scanning():
         from fastapi import HTTPException
         raise HTTPException(status_code=409, detail="A scan is already running. Stop it first.")

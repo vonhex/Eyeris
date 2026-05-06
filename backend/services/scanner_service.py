@@ -1,7 +1,5 @@
 import asyncio
 import os
-import json
-import subprocess
 from datetime import datetime, time as dtime
 
 from sqlalchemy import func
@@ -9,15 +7,13 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from database import SessionLocal
-from models import Image, Tag, ImageTag, Face, ScanJob, ImageTagBlock
+from models import Image, Tag, ImageTag, ScanJob, ImageTagBlock
 from services.smb_service import list_images, read_file_bytes, move_file, delete_file, _local_path
 from services.image_service import (
     process_image_bytes, compute_hash, parse_xmp_metadata, 
     generate_thumbnail, is_video, process_video_file
 )
 from services.search_service import index_image as es_index_image
-
-from services.gpu_models import analyze_image_local
 
 # Module-level state for the background scanner
 _scanner_task: asyncio.Task | None = None
@@ -455,80 +451,9 @@ async def _discover_image(db: Session, img_info: dict):
     db.add(new_img)
     db.flush()
 
-    if not is_vid and data:
-        # Local vision analysis (YOLO + FaceNet)
-        try:
-            from services.gpu_models import analyze_image_local
-            from PIL import Image as PILImage
-            from io import BytesIO
-            
-            img_pil = PILImage.open(BytesIO(data))
-            local_analysis = await asyncio.to_thread(analyze_image_local, data)
-            _save_faces(db, new_img, local_analysis["faces"], img_pil)
-        except Exception as e:
-            print(f"[Scanner] Local analysis error for {file_path}: {e}")
-
     # Load XMP tags if present
     await _load_xmp_for_image(db, new_img)
 
-
-
-def _save_faces(db: Session, img_record: Image, face_data: list[dict], img_pil=None):
-    """Save face analysis results to DB, including embeddings and crops."""
-    if not face_data:
-        return
-
-    img_record.face_count = len(face_data)
-    
-    from PIL import Image as PILImage
-    import uuid
-    from config import settings
-    
-    for fd in face_data:
-        bbox = fd["bbox"] # [x1, y1, x2, y2]
-        crop_path = None
-        
-        # Generate crop if PIL image is provided
-        if img_pil:
-            try:
-                x1, y1, x2, y2 = bbox
-                w, h = img_pil.size
-                
-                # Add 25% padding around the face for a better portrait look
-                px = int((x2 - x1) * 0.25)
-                py = int((y2 - y1) * 0.25)
-                x1c = max(0, x1 - px)
-                y1c = max(0, y1 - py)
-                x2c = min(w, x2 + px)
-                y2c = min(h, y2 + py)
-                
-                if (x2c - x1c) > 10 and (y2c - y1c) > 10:
-                    crop = img_pil.crop((x1c, y1c, x2c, y2c))
-                    # High quality face thumbnails
-                    crop.thumbnail((256, 256), PILImage.Resampling.LANCZOS)
-                    
-                    filename = f"face_{uuid.uuid4().hex}.jpg"
-                    full_path = os.path.join(settings.THUMBNAIL_DIR, filename)
-                    
-                    if crop.mode != "RGB":
-                        crop = crop.convert("RGB")
-                    
-                    crop.save(full_path, "JPEG", quality=95)
-                    crop_path = filename
-            except Exception as e:
-                print(f"[Scanner] Face crop failed for {img_record.filename}: {e}")
-
-        face = Face(
-            image_id=img_record.id,
-            face_bbox=json.dumps(bbox),
-            position=fd.get("position"),
-            embedding=json.dumps(fd.get("embedding")) if fd.get("embedding") else None,
-            crop_path=crop_path,
-        )
-        db.add(face)
-
-    if img_record.face_count > 0:
-        print(f"[Faces] Detected {img_record.face_count} faces in {img_record.filename}")
 
 
 async def _load_xmp_for_image(db: Session, img_record: Image, xmp_base_path: str | None = None):
@@ -653,25 +578,16 @@ async def run_full_resync() -> int:
                 else:
                     thumb_missing = True
 
-                # Local AI re-analysis or thumbnail regeneration
-                if thumb_missing or not img_record.faces or not img_record.categories:
+                if thumb_missing:
                     parts = img_record.file_path.split("/", 1)
                     share = parts[0]
                     rel_path = parts[1] if len(parts) > 1 else ""
                     data = await asyncio.to_thread(read_file_bytes, share, rel_path)
-                    
                     from PIL import Image as PILImage
                     img_pil = PILImage.open(BytesIO(data))
-                    
-                    # Regenerate thumbnail if missing
-                    if thumb_missing:
-                        new_thumb = await asyncio.to_thread(generate_thumbnail, img_pil)
-                        img_record.thumbnail_path = new_thumb
-                        print(f"[Resync] Regenerated missing thumbnail for {img_record.filename}")
-
-                    local_analysis = await asyncio.to_thread(analyze_image_local, data)
-                    if not img_record.faces:
-                        _save_faces(db, img_record, local_analysis["faces"], img_pil)
+                    new_thumb = await asyncio.to_thread(generate_thumbnail, img_pil)
+                    img_record.thumbnail_path = new_thumb
+                    print(f"[Resync] Regenerated missing thumbnail for {img_record.filename}")
             except Exception as e:
                 print(f"[Resync] Error for {img_record.file_path}: {e}")
 

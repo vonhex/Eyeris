@@ -27,7 +27,7 @@ export default function Duplicates() {
   const [anyScanRunning, setAnyScanRunning] = useState(false)
 
   useEffect(() => {
-    const ACTIVE = ["listing", "running", "analyzing", "gpu_rescan", "phash"]
+    const ACTIVE = ["listing", "running", "analyzing", "phash"]
     const interval = setInterval(async () => {
       try {
         const status = await getScanStatus()

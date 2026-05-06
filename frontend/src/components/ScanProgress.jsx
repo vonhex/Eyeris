@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { getScanStatus, startScan, startGpuRescan, stopScan, pauseScan, resumeScan } from "../api"
+import { getScanStatus, startScan, stopScan, pauseScan, resumeScan } from "../api"
 
 export default function ScanProgress() {
   const [status, setStatus] = useState(null)
@@ -21,8 +21,7 @@ export default function ScanProgress() {
   const isListing = job?.status === "listing"
   const isDiscovering = job?.status === "running"
   const isAnalyzing = job?.status === "analyzing"
-  const isGpuRescan = job?.status === "gpu_rescan"
-  const isActive = isListing || isDiscovering || isAnalyzing || isGpuRescan
+  const isActive = isListing || isDiscovering || isAnalyzing
 
   useEffect(() => {
     if (!isActive) setStopping(false)
@@ -60,7 +59,7 @@ export default function ScanProgress() {
   }
 
   const p1Pct = job.phase1_total > 0 ? Math.round((job.phase1_done / job.phase1_total) * 100) : 0
-  const p1Active = isDiscovering || isGpuRescan
+  const p1Active = isDiscovering
   const p1Indeterminate = p1Active && job.phase1_done === 0 && job.phase1_total > 0
 
   const handleStop = () => {
@@ -74,8 +73,6 @@ export default function ScanProgress() {
     ? "Paused"
     : isListing
     ? "Checking NAS..."
-    : isGpuRescan
-    ? "Resyncing Library — All Images"
     : isActive
     ? "Syncing Images"
     : job.status === "completed"
@@ -96,15 +93,6 @@ export default function ScanProgress() {
       <div className="flex items-center justify-between gap-2">
         <h3 className={`text-sm font-medium ${paused ? "text-amber-400" : "text-gray-300"}`}>{statusLabel}</h3>
         <div className="flex gap-2">
-          {!isActive && (
-            <button
-              onClick={() => doAction(startGpuRescan)}
-              disabled={actionPending}
-              className="text-xs px-3 py-1 rounded transition disabled:opacity-50 bg-green-700 hover:bg-green-600 text-white"
-            >
-              {actionPending ? "..." : "Resync All Images"}
-            </button>
-          )}
           {isActive && !paused && (
             <button
               onClick={() => doAction(pauseScan)}
