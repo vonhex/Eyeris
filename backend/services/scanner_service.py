@@ -28,14 +28,17 @@ _pause_event.set()  # not paused initially (set = unblocked)
 _trigger_event: asyncio.Event = asyncio.Event()
 
 
-async def _load_metadata_from_aeye(rel_path: str) -> dict | None:
+async def _load_metadata_from_aeye(rel_path: str, file_hash: str | None = None) -> dict | None:
     """Fetch robust EXIF metadata from A-Eye via its API."""
     if not settings.AEYE_URL:
         return None
 
-    # rel_path is something like "photos/IMG_1234.jpg"
-    # A-Eye's photos_dir is usually mapped to the same NAS root
-    url = f"{settings.AEYE_URL.rstrip('/')}/api/images/by-path/{rel_path.lstrip('/')}"
+    # Prefer hash-based lookup if available
+    if file_hash:
+        url = f"{settings.AEYE_URL.rstrip('/')}/api/images/by-hash/{file_hash}"
+    else:
+        # rel_path is something like "photos/IMG_1234.jpg"
+        url = f"{settings.AEYE_URL.rstrip('/')}/api/images/by-path/{rel_path.lstrip('/')}"
     
     auth = None
     if settings.AEYE_USER and settings.AEYE_PASS:
@@ -47,21 +50,19 @@ async def _load_metadata_from_aeye(rel_path: str) -> dict | None:
             if resp.status_code == 200:
                 data = resp.json()
                 # A-Eye schema: camera_model, exif_raw (json string in DB, dict in API)
-                # Shooting data in A-Eye's raw EXIF:
-                # Aperture (33437), Shutter (33434), ISO (34855), FocalLength (37386), LensModel (42036)
                 raw = data.get("exif_raw") or {}
                 
-                # A-Eye might have pre-parsed these into columns or we can extract from raw
-                # A-Eye actually stores camera_model, gps_lat, gps_lon, exif_date in columns
                 return {
                     "camera_model": data.get("camera_model"),
                     "gps_lat": data.get("gps_lat"),
                     "gps_lon": data.get("gps_lon"),
-                    "date_taken": data.get("exif_date"), # This is "YYYY-MM-DD" in A-Eye
+                    "date_taken": data.get("exif_date"),
                     "raw_exif": raw
                 }
     except Exception as e:
-        print(f"[A-Eye API] Failed to fetch metadata for {rel_path}: {e}")
+        # Don't log 404s as errors, they just mean A-Eye hasn't seen the file yet
+        if not (hasattr(e, 'response') and e.response.status_code == 404):
+            print(f"[A-Eye API] Failed to fetch metadata for {rel_path}: {e}")
     
     return None
 
@@ -491,7 +492,7 @@ async def _discover_image(db: Session, img_info: dict):
     )
 
     # Attempt to enrich with robust metadata from A-Eye API
-    aeye_meta = await _load_metadata_from_aeye(img_info["relative_path"])
+    aeye_meta = await _load_metadata_from_aeye(img_info["relative_path"], file_hash=meta["file_hash"])
     if aeye_meta:
         if aeye_meta.get("camera_model"):
             new_img.camera_model = aeye_meta["camera_model"]
@@ -664,7 +665,7 @@ async def run_full_resync() -> int:
                 # Attempt to enrich with robust metadata from A-Eye API (if missing)
                 parts = img_record.file_path.split("/", 1)
                 rel_path = parts[1] if len(parts) > 1 else ""
-                aeye_meta = await _load_metadata_from_aeye(rel_path)
+                aeye_meta = await _load_metadata_from_aeye(rel_path, file_hash=img_record.file_hash)
                 if aeye_meta:
                     if aeye_meta.get("camera_model") and not img_record.camera_model:
                         img_record.camera_model = aeye_meta["camera_model"]
