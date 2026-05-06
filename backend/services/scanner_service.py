@@ -233,6 +233,32 @@ async def _scan_loop():
                 break
 
 
+async def _auto_send_to_aeye():
+    """After a scan, auto-send any untagged images to A-Eye if configured."""
+    if not settings.AEYE_URL:
+        return
+    db = SessionLocal()
+    try:
+        images = db.query(Image).filter(~Image.tags.any(), Image.is_video == False).all()
+        if not images:
+            return
+        image_ids = [img.id for img in images]
+    finally:
+        db.close()
+
+    import threading
+    from routers.aeye import _job, _job_lock, _run_analyze_untagged
+    with _job_lock:
+        if _job["running"]:
+            print(f"[Scanner] A-Eye job already running — skipping auto-send of {len(image_ids)} untagged images")
+            return
+
+    base = settings.AEYE_URL.rstrip("/")
+    print(f"[Scanner] Auto-sending {len(image_ids)} untagged images to A-Eye")
+    t = threading.Thread(target=_run_analyze_untagged, args=(image_ids, base), daemon=True)
+    t.start()
+
+
 async def run_scan() -> int:
     """Run a full scan: Lists shares and syncs images (including XMP tags)."""
     global _current_job_id, _stop_requested
@@ -252,6 +278,10 @@ async def run_scan() -> int:
         job.completed_at = datetime.utcnow()
         db.commit()
         print("[Scanner] Scan complete.")
+
+        if not _stop_requested:
+            asyncio.create_task(_auto_send_to_aeye())
+
         return job.id
 
     except Exception as e:
