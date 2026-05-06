@@ -74,7 +74,7 @@ export const createSmartAlbum = (name, filters) => api.post("/smart-albums", { n
 export const updateSmartAlbum = (id, name, filters) => api.put(`/smart-albums/${id}`, { name, filters }).then((r) => r.data)
 export const deleteSmartAlbum = (id) => api.delete(`/smart-albums/${id}`).then((r) => r.data)
 export const searxngSearch = (q, page = 1, category = "images") => api.get("/searxng/search", { params: { q, page, category } }).then((r) => r.data)
-export const searxngDownload = (urls, share, subfolder) => api.post("/searxng/download", { urls, share, subfolder }).then((r) => r.data)
+export const searxngDownload = (urls, subfolder) => api.post("/searxng/download", { urls, subfolder }).then((r) => r.data)
 export const searxngProxyUrl = (url) => {
   const t = getToken()
   return `/api/searxng/proxy?url=${encodeURIComponent(url)}${t ? `&token=${t}` : ""}`

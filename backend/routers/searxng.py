@@ -100,70 +100,82 @@ async def proxy_image(url: str = Query(...), token: str = Query(None)):
     return Response(content=resp.content, media_type=content_type)
 
 
+from typing import Optional
+
 class DownloadRequest(BaseModel):
     urls: list[str]
-    subfolder: str = "web-downloads"
+    subfolder: Optional[str] = "web-downloads"
 
 
 @router.post("/download")
 async def download_to_nas(body: DownloadRequest):
     """Download images from URLs and write them to a folder within MOUNT_BASE."""
     from config import settings
+    import traceback
 
-    if not body.urls:
-        raise HTTPException(status_code=400, detail="No URLs provided")
-    
-    subfolder = body.subfolder.strip() or "web-downloads"
-
-    for url in body.urls:
-        _validate_url(url)
-
-    dest_dir = os.path.join(settings.MOUNT_BASE, subfolder)
     try:
-        os.makedirs(dest_dir, exist_ok=True)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not create destination directory: {e}")
+        if not body.urls:
+            raise HTTPException(status_code=400, detail="No URLs provided")
+        
+        subfolder = (body.subfolder or "web-downloads").strip() or "web-downloads"
 
-    EXT_MAP = {
-        "image/jpeg": ".jpg",
-        "image/png": ".png",
-        "image/webp": ".webp",
-        "image/gif": ".gif",
-        "image/bmp": ".bmp",
-    }
-    VALID_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
-
-    saved = []
-    errors = []
-
-    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
         for url in body.urls:
-            try:
-                resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible)"})
-                resp.raise_for_status()
+            _validate_url(url)
 
-                path_part = urlparse(url).path
-                filename = os.path.basename(path_part) or "image"
-                # Strip query params that may have crept into the filename
-                filename = filename.split("?")[0]
-                base, ext = os.path.splitext(filename)
-                if ext.lower() not in VALID_EXTS:
-                    ct = resp.headers.get("content-type", "").split(";")[0].strip()
-                    ext = EXT_MAP.get(ct, ".jpg")
-                    filename = (base or "image") + ext
+        dest_dir = os.path.join(settings.MOUNT_BASE, subfolder)
+        try:
+            os.makedirs(dest_dir, exist_ok=True)
+        except Exception as e:
+            print(f"[SearXNG] Failed to create directory {dest_dir}: {e}")
+            raise HTTPException(status_code=500, detail=f"Could not create destination directory: {e}")
 
-                # Avoid collisions
-                dest = os.path.join(dest_dir, filename)
-                if os.path.exists(dest):
-                    base2, ext2 = os.path.splitext(filename)
-                    filename = f"{base2}_{int(time.time() * 1000)}{ext2}"
+        EXT_MAP = {
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/webp": ".webp",
+            "image/gif": ".gif",
+            "image/bmp": ".bmp",
+        }
+        VALID_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
+
+        saved = []
+        errors = []
+
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            for url in body.urls:
+                try:
+                    resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible)"})
+                    resp.raise_for_status()
+
+                    path_part = urlparse(url).path
+                    filename = os.path.basename(path_part) or "image"
+                    # Strip query params that may have crept into the filename
+                    filename = filename.split("?")[0]
+                    base, ext = os.path.splitext(filename)
+                    if ext.lower() not in VALID_EXTS:
+                        ct = resp.headers.get("content-type", "").split(";")[0].strip()
+                        ext = EXT_MAP.get(ct, ".jpg")
+                        filename = (base or "image") + ext
+
+                    # Avoid collisions
                     dest = os.path.join(dest_dir, filename)
+                    if os.path.exists(dest):
+                        base2, ext2 = os.path.splitext(filename)
+                        filename = f"{base2}_{int(time.time() * 1000)}{ext2}"
+                        dest = os.path.join(dest_dir, filename)
 
-                with open(dest, "wb") as f:
-                    f.write(resp.content)
+                    with open(dest, "wb") as f:
+                        f.write(resp.content)
 
-                saved.append(filename)
-            except Exception as e:
-                errors.append({"url": url, "error": str(e)})
+                    saved.append(filename)
+                except Exception as e:
+                    print(f"[SearXNG] Download failed for {url}: {e}")
+                    errors.append({"url": url, "error": str(e)})
 
-    return {"saved": len(saved), "filenames": saved, "errors": errors}
+        return {"saved": len(saved), "filenames": saved, "errors": errors}
+    except Exception as e:
+        print(f"[SearXNG] Global download error: {e}")
+        traceback.print_exc()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=str(e))
