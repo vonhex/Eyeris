@@ -108,7 +108,7 @@ class DownloadRequest(BaseModel):
 @router.post("/download")
 async def download_to_nas(body: DownloadRequest):
     """Download images from URLs and write them to a folder within MOUNT_BASE."""
-    from services.smb_service import MOUNT_BASE
+    from config import settings
 
     if not body.urls:
         raise HTTPException(status_code=400, detail="No URLs provided")
@@ -118,7 +118,7 @@ async def download_to_nas(body: DownloadRequest):
     for url in body.urls:
         _validate_url(url)
 
-    dest_dir = os.path.join(MOUNT_BASE, subfolder)
+    dest_dir = os.path.join(settings.MOUNT_BASE, subfolder)
     try:
         os.makedirs(dest_dir, exist_ok=True)
     except Exception as e:
