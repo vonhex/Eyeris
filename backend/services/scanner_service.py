@@ -1,6 +1,7 @@
 import asyncio
 import os
 import httpx
+from io import BytesIO
 from datetime import datetime, time as dtime
 
 from sqlalchemy import func
@@ -659,9 +660,58 @@ async def run_full_resync() -> int:
             try:
                 # Reload XMP
                 await _load_xmp_for_image(db, img_record)
-                
-                # Check for missing thumbnail on disk
-                thumb_missing = False
+
+                # Attempt to enrich with robust metadata from A-Eye API (if missing)
+                parts = img_record.file_path.split("/", 1)
+                rel_path = parts[1] if len(parts) > 1 else ""
+                aeye_meta = await _load_metadata_from_aeye(rel_path)
+                if aeye_meta:
+                    if aeye_meta.get("camera_model") and not img_record.camera_model:
+                        img_record.camera_model = aeye_meta["camera_model"]
+                    if aeye_meta.get("gps_lat") is not None and img_record.gps_lat is None:
+                        img_record.gps_lat = aeye_meta["gps_lat"]
+                    if aeye_meta.get("gps_lon") is not None and img_record.gps_lon is None:
+                        img_record.gps_lon = aeye_meta["gps_lon"]
+
+                    raw = aeye_meta.get("raw_exif") or {}
+
+                    # Aperture (33437)
+                    if not img_record.aperture and "EXIF FNumber" in raw:
+                        try:
+                            val = raw["EXIF FNumber"]
+                            if "/" in val:
+                                n, d = map(float, val.split("/"))
+                                img_record.aperture = round(n/d, 1)
+                            else:
+                                img_record.aperture = float(val)
+                        except Exception: pass
+
+                    # Shutter (33434)
+                    if not img_record.shutter_speed and "EXIF ExposureTime" in raw:
+                        img_record.shutter_speed = raw["EXIF ExposureTime"]
+
+                    # ISO (34855)
+                    if not img_record.iso and "EXIF ISOSpeedRatings" in raw:
+                        try:
+                            img_record.iso = int(raw["EXIF ISOSpeedRatings"])
+                        except Exception: pass
+
+                    # Focal Length (37386)
+                    if not img_record.focal_length and "EXIF FocalLength" in raw:
+                        try:
+                            val = raw["EXIF FocalLength"]
+                            if "/" in val:
+                                n, d = map(float, val.split("/"))
+                                img_record.focal_length = round(n/d, 1)
+                            else:
+                                img_record.focal_length = float(val)
+                        except Exception: pass
+
+                    # Lens Model (42036)
+                    if not img_record.lens_model and "EXIF LensModel" in raw:
+                        img_record.lens_model = raw["EXIF LensModel"]
+
+                # Check for missing thumbnail on disk                thumb_missing = False
                 if img_record.thumbnail_path:
                     thumb_full_path = os.path.join(settings.THUMBNAIL_DIR, img_record.thumbnail_path)
                     if not os.path.exists(thumb_full_path):
