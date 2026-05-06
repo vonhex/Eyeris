@@ -1,5 +1,6 @@
 import asyncio
 import os
+import httpx
 from datetime import datetime, time as dtime
 
 from sqlalchemy import func
@@ -24,6 +25,44 @@ _paused: bool = False
 _pause_event: asyncio.Event = asyncio.Event()
 _pause_event.set()  # not paused initially (set = unblocked)
 _trigger_event: asyncio.Event = asyncio.Event()
+
+
+async def _load_metadata_from_aeye(rel_path: str) -> dict | None:
+    """Fetch robust EXIF metadata from A-Eye via its API."""
+    if not settings.AEYE_URL:
+        return None
+
+    # rel_path is something like "photos/IMG_1234.jpg"
+    # A-Eye's photos_dir is usually mapped to the same NAS root
+    url = f"{settings.AEYE_URL.rstrip('/')}/api/images/by-path/{rel_path.lstrip('/')}"
+    
+    auth = None
+    if settings.AEYE_USER and settings.AEYE_PASS:
+        auth = (settings.AEYE_USER, settings.AEYE_PASS)
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, auth=auth)
+            if resp.status_code == 200:
+                data = resp.json()
+                # A-Eye schema: camera_model, exif_raw (json string in DB, dict in API)
+                # Shooting data in A-Eye's raw EXIF:
+                # Aperture (33437), Shutter (33434), ISO (34855), FocalLength (37386), LensModel (42036)
+                raw = data.get("exif_raw") or {}
+                
+                # A-Eye might have pre-parsed these into columns or we can extract from raw
+                # A-Eye actually stores camera_model, gps_lat, gps_lon, exif_date in columns
+                return {
+                    "camera_model": data.get("camera_model"),
+                    "gps_lat": data.get("gps_lat"),
+                    "gps_lon": data.get("gps_lon"),
+                    "date_taken": data.get("exif_date"), # This is "YYYY-MM-DD" in A-Eye
+                    "raw_exif": raw
+                }
+    except Exception as e:
+        print(f"[A-Eye API] Failed to fetch metadata for {rel_path}: {e}")
+    
+    return None
 
 
 def _parse_schedule_time(t: str) -> dtime:
@@ -449,6 +488,57 @@ async def _discover_image(db: Session, img_info: dict):
         iso=meta.get("iso"),
         focal_length=meta.get("focal_length"),
     )
+
+    # Attempt to enrich with robust metadata from A-Eye API
+    aeye_meta = await _load_metadata_from_aeye(img_info["relative_path"])
+    if aeye_meta:
+        if aeye_meta.get("camera_model"):
+            new_img.camera_model = aeye_meta["camera_model"]
+        if aeye_meta.get("gps_lat") is not None:
+            new_img.gps_lat = aeye_meta["gps_lat"]
+        if aeye_meta.get("gps_lon") is not None:
+            new_img.gps_lon = aeye_meta["gps_lon"]
+        
+        # Extract shooting data from A-Eye's raw EXIF if local extraction was shallow
+        raw = aeye_meta.get("raw_exif") or {}
+        
+        # Aperture (33437)
+        if not new_img.aperture and "EXIF FNumber" in raw:
+            try:
+                # exifread format is usually "2.8" or "14/5"
+                val = raw["EXIF FNumber"]
+                if "/" in val:
+                    n, d = map(float, val.split("/"))
+                    new_img.aperture = round(n/d, 1)
+                else:
+                    new_img.aperture = float(val)
+            except Exception: pass
+            
+        # Shutter (33434)
+        if not new_img.shutter_speed and "EXIF ExposureTime" in raw:
+            new_img.shutter_speed = raw["EXIF ExposureTime"]
+            
+        # ISO (34855)
+        if not new_img.iso and "EXIF ISOSpeedRatings" in raw:
+            try:
+                new_img.iso = int(raw["EXIF ISOSpeedRatings"])
+            except Exception: pass
+            
+        # Focal Length (37386)
+        if not new_img.focal_length and "EXIF FocalLength" in raw:
+            try:
+                val = raw["EXIF FocalLength"]
+                if "/" in val:
+                    n, d = map(float, val.split("/"))
+                    new_img.focal_length = round(n/d, 1)
+                else:
+                    new_img.focal_length = float(val)
+            except Exception: pass
+            
+        # Lens Model (42036)
+        if not new_img.lens_model and "EXIF LensModel" in raw:
+            new_img.lens_model = raw["EXIF LensModel"]
+
     db.add(new_img)
     db.flush()
 
