@@ -7,8 +7,6 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [message, setMessage] = useState(null)
-  const [newShare, setNewShare] = useState("")
-  const [smbPassword, setSmbPassword] = useState("")
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [changingPassword, setChangingPassword] = useState(false)
@@ -29,9 +27,6 @@ export default function Settings() {
     setMessage(null)
     try {
       const payload = {
-        smb_host: settings.smb_host,
-        smb_username: settings.smb_username,
-        smb_shares: settings.smb_shares,
         scan_concurrency: settings.scan_concurrency,
         scan_interval_minutes: settings.scan_interval_minutes,
         scan_schedule_enabled: settings.scan_schedule_enabled || false,
@@ -42,26 +37,12 @@ export default function Settings() {
         aeye_user: settings.aeye_user || "",
         ...(settings.aeye_pass ? { aeye_pass: settings.aeye_pass } : {}),
       }
-      if (smbPassword) payload.smb_password = smbPassword
       await updateSettings(payload)
       setMessage({ type: "success", text: "Settings saved. Restart scan for changes to take effect." })
-      setSmbPassword("")
     } catch (err) {
       setMessage({ type: "error", text: "Failed to save settings" })
     }
     setSaving(false)
-  }
-
-  const addShare = () => {
-    const s = newShare.trim()
-    if (s && !settings.smb_shares.includes(s)) {
-      setSettings({ ...settings, smb_shares: [...settings.smb_shares, s] })
-      setNewShare("")
-    }
-  }
-
-  const removeShare = (share) => {
-    setSettings({ ...settings, smb_shares: settings.smb_shares.filter((s) => s !== share) })
   }
 
   return (
@@ -75,65 +56,6 @@ export default function Settings() {
           {message.text}
         </div>
       )}
-
-      {/* NAS Connection */}
-      <Section title="NAS Connection (SMB)">
-        <Field label="NAS IP Address">
-          <input
-            type="text"
-            value={settings.smb_host}
-            onChange={(e) => setSettings({ ...settings, smb_host: e.target.value })}
-            className="input-field"
-          />
-        </Field>
-        <Field label="Username">
-          <input
-            type="text"
-            value={settings.smb_username}
-            onChange={(e) => setSettings({ ...settings, smb_username: e.target.value })}
-            className="input-field"
-          />
-        </Field>
-        <Field label="Password">
-          <input
-            type="password"
-            value={smbPassword}
-            onChange={(e) => setSmbPassword(e.target.value)}
-            placeholder="Leave blank to keep current"
-            className="input-field"
-          />
-        </Field>
-      </Section>
-
-      {/* Share Folders */}
-      <Section title="Share Folders">
-        <div className="space-y-2">
-          {settings.smb_shares.map((share) => {
-            return (
-              <div key={share} className="flex items-center gap-2 bg-gray-800 rounded px-3 py-2">
-                <span className="flex-1 text-sm text-gray-300">{share}</span>
-                <button
-                  onClick={() => removeShare(share)}
-                  className="text-xs text-red-400 hover:text-red-300"
-                >
-                  Remove
-                </button>
-              </div>
-            )
-          })}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newShare}
-              onChange={(e) => setNewShare(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addShare()}
-              placeholder="Share name (e.g. Photos)"
-              className="input-field flex-1"
-            />
-            <button onClick={addShare} className="btn-primary">Add</button>
-          </div>
-        </div>
-      </Section>
 
       {/* Scanner */}
       <Section title="Scanner">

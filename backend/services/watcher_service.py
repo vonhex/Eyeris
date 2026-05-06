@@ -56,9 +56,9 @@ async def start_watcher():
     if _watcher_task and not _watcher_task.done():
         return  # already running
 
-    paths = init_watch_paths(settings.SMB_SHARES)
-    if not paths:
-        print("[Watcher] No mounted NAS shares found — file watching disabled")
+    paths = [settings.MOUNT_BASE]
+    if not os.path.isdir(settings.MOUNT_BASE):
+        print(f"[Watcher] Mount point {settings.MOUNT_BASE} not found — file watching disabled")
         return
 
     _watcher_task = asyncio.create_task(_watch_loop(paths))
@@ -115,23 +115,14 @@ async def _handle_new_file(full_path: str):
 
         mount_base = Path(settings.MOUNT_BASE)
         rel_to_mount = p.relative_to(mount_base)
-        parts = rel_to_mount.parts
         
-        shares = [s.strip() for s in settings.SMB_SHARES if s.strip()]
-        
-        if not shares:
-            # Root mount point is being watched
-            share = ""
-            relative = str(rel_to_mount)
-        else:
-            if len(parts) < 2:
-                return
-            share = parts[0]
-            relative = str(Path(*parts[1:]))
+        # All files are relative to the root mount base
+        share = ""
+        relative = str(rel_to_mount)
 
         file_size = p.stat().st_size
 
-        print(f"[Watcher] New file: {share}/{relative} ({file_size // 1024} KB)")
+        print(f"[Watcher] New file: {relative} ({file_size // 1024} KB)")
         from services.scanner_service import discover_new_file
         await discover_new_file(share, relative, file_size)
     except Exception as e:

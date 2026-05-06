@@ -10,8 +10,6 @@ export default function ImageSearch() {
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState(null)
   const [selected, setSelected] = useState(new Set())
-  const [shares, setShares] = useState([])
-  const [destShare, setDestShare] = useState("")
   const [subfolder, setSubfolder] = useState("web-downloads")
   const [downloading, setDownloading] = useState(false)
   const [downloadResult, setDownloadResult] = useState(null)
@@ -19,13 +17,6 @@ export default function ImageSearch() {
   const inputRef = useRef(null)
 
   useEffect(() => {
-    getSettings()
-      .then((s) => {
-        const list = s.smb_shares || []
-        setShares(list)
-        if (list.length > 0) setDestShare(list[0])
-      })
-      .catch(() => {})
     inputRef.current?.focus()
   }, [])
 
@@ -77,11 +68,11 @@ export default function ImageSearch() {
   const selectNone = () => setSelected(new Set())
 
   const handleDownload = async () => {
-    if (!selected.size || !destShare) return
+    if (!selected.size) return
     setDownloading(true)
     setDownloadResult(null)
     try {
-      const result = await searxngDownload([...selected], destShare, subfolder)
+      const result = await searxngDownload([...selected], subfolder)
       setDownloadResult(result)
       setSelected(new Set())
     } catch (e) {
@@ -158,17 +149,6 @@ export default function ImageSearch() {
           </div>
           <span className="text-sm text-gray-300 font-medium">{selected.size} selected</span>
           <div className="flex-1" />
-          {/* Destination picker */}
-          <select
-            value={destShare}
-            onChange={(e) => setDestShare(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-300 focus:outline-none focus:border-blue-500"
-          >
-            {shares.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-            {shares.length === 0 && <option value="">No shares configured</option>}
-          </select>
           <input
             type="text"
             value={subfolder}
@@ -178,10 +158,10 @@ export default function ImageSearch() {
           />
           <button
             onClick={handleDownload}
-            disabled={!selected.size || downloading || !destShare}
+            disabled={!selected.size || downloading}
             className="px-4 py-1.5 bg-green-800 hover:bg-green-700 text-green-300 hover:text-white rounded-lg text-sm transition disabled:opacity-30"
           >
-            {downloading ? "Saving…" : `Save to NAS${selected.size > 0 ? ` (${selected.size})` : ""}`}
+            {downloading ? "Saving…" : `Save to App${selected.size > 0 ? ` (${selected.size})` : ""}`}
           </button>
         </div>
       )}
@@ -197,7 +177,7 @@ export default function ImageSearch() {
             ? downloadResult.error
             : <>
                 Saved {downloadResult.saved} image{downloadResult.saved !== 1 ? "s" : ""} to{" "}
-                <span className="font-mono">{destShare}/{subfolder}</span>
+                <span className="font-mono">{subfolder}</span>
                 {downloadResult.errors?.length > 0 && (
                   <span className="text-yellow-400 ml-2">
                     ({downloadResult.errors.length} failed)

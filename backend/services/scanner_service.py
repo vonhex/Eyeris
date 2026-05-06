@@ -276,41 +276,12 @@ async def _sync_task(db: Session, job: ScanJob):
     job.status = "listing"
     db.commit()
 
-    async def _list_share(share: str) -> list:
-        try:
-            imgs = await asyncio.to_thread(list_images, share)
-            print(f"[Scanner] {share}: {len(imgs)} images")
-            job.total_images = (job.total_images or 0) + len(imgs)
-            db.commit()
-            return imgs
-        except Exception as e:
-            print(f"[Scanner] Error listing {share}: {e}")
-            return []
+    if not os.path.isdir(settings.MOUNT_BASE):
+        print(f"[Scanner] Mount not found: {settings.MOUNT_BASE}. Skipping scan.")
+        return
 
-    shares = [s.strip() for s in settings.SMB_SHARES if s.strip()]
-    if not shares:
-        # If no specific shares, try to scan the root mount point
-        if os.path.isdir(settings.MOUNT_BASE):
-            shares = [""] # Empty string will result in using MOUNT_BASE itself as the path
-        else:
-            print(f"[Scanner] No shares configured and {settings.MOUNT_BASE} not found. Skipping scan.")
-            return
-
-    # Launch listing tasks but poll for stop every 0.5 s so we can bail out
-    listing_tasks = [asyncio.create_task(_list_share(s)) for s in shares]
-    while not all(t.done() for t in listing_tasks):
-        if _stop_requested:
-            print("[Scanner] Stop requested during NAS listing — cancelling.")
-            for t in listing_tasks:
-                t.cancel()
-            await asyncio.gather(*listing_tasks, return_exceptions=True)
-            return
-        await asyncio.sleep(0.5)
-
-    results = [t.result() if not t.cancelled() and t.exception() is None else [] for t in listing_tasks]
-    all_image_infos = [img for imgs in results for img in imgs]
-
-    print(f"[Scanner] Total images across all shares: {len(all_image_infos)}")
+    all_image_infos = await asyncio.to_thread(list_images, "")
+    print(f"[Scanner] Total images found: {len(all_image_infos)}")
 
     if _stop_requested:
         print("[Scanner] Stop requested after listing — skipping sync.")

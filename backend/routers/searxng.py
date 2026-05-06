@@ -102,26 +102,23 @@ async def proxy_image(url: str = Query(...), token: str = Query(None)):
 
 class DownloadRequest(BaseModel):
     urls: list[str]
-    share: str
     subfolder: str = "web-downloads"
 
 
 @router.post("/download")
 async def download_to_nas(body: DownloadRequest):
-    """Download images from URLs and write them to a NAS share."""
+    """Download images from URLs and write them to a folder within MOUNT_BASE."""
     from services.smb_service import MOUNT_BASE
 
     if not body.urls:
         raise HTTPException(status_code=400, detail="No URLs provided")
-    share = body.share.strip()
-    if not share:
-        raise HTTPException(status_code=400, detail="No share specified")
+    
     subfolder = body.subfolder.strip() or "web-downloads"
 
     for url in body.urls:
         _validate_url(url)
 
-    dest_dir = os.path.join(MOUNT_BASE, share, subfolder)
+    dest_dir = os.path.join(MOUNT_BASE, subfolder)
     try:
         os.makedirs(dest_dir, exist_ok=True)
     except Exception as e:

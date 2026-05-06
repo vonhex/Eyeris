@@ -6,12 +6,6 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'), override=True
 
 
 class Settings:
-    # SMB / NAS
-    SMB_HOST: str = os.getenv("SMB_HOST", "10.0.1.228")
-    SMB_USERNAME: str = os.getenv("SMB_USERNAME", "")
-    SMB_PASSWORD: str = os.getenv("SMB_PASSWORD", "")
-    SMB_SHARES: list[str] = os.getenv("SMB_SHARES", "").split(",")
-
     # Database — SQLite by default (good for Docker/Unraid), MariaDB when DB_HOST is set
     DB_HOST: str = os.getenv("DB_HOST", "")
     DB_PORT: int = int(os.getenv("DB_PORT", "3306"))

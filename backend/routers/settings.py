@@ -125,9 +125,6 @@ def _write_env(env: dict[str, str]):
 
 
 class SettingsResponse(BaseModel):
-    smb_host: str
-    smb_username: str
-    smb_shares: list[str]
     scan_concurrency: int
     scan_interval_minutes: int
     scan_schedule_enabled: bool
@@ -139,10 +136,6 @@ class SettingsResponse(BaseModel):
 
 
 class SettingsUpdate(BaseModel):
-    smb_host: str | None = None
-    smb_username: str | None = None
-    smb_password: str | None = None
-    smb_shares: list[str] | None = None
     scan_concurrency: int | None = None
     scan_interval_minutes: int | None = None
     scan_schedule_enabled: bool | None = None
@@ -157,9 +150,6 @@ class SettingsUpdate(BaseModel):
 @router.get("", response_model=SettingsResponse)
 def get_settings():
     return SettingsResponse(
-        smb_host=settings.SMB_HOST,
-        smb_username=settings.SMB_USERNAME,
-        smb_shares=[s.strip() for s in settings.SMB_SHARES if s.strip()],
         scan_concurrency=settings.SCAN_CONCURRENCY,
         scan_interval_minutes=settings.SCAN_INTERVAL_MINUTES,
         scan_schedule_enabled=settings.SCAN_SCHEDULE_ENABLED,
@@ -175,27 +165,6 @@ def get_settings():
 def update_settings(body: SettingsUpdate):
     env = _read_env()
     changed = []
-
-    if body.smb_host is not None:
-        env["SMB_HOST"] = body.smb_host
-        settings.SMB_HOST = body.smb_host
-        changed.append("SMB_HOST")
-
-    if body.smb_username is not None:
-        env["SMB_USERNAME"] = body.smb_username
-        settings.SMB_USERNAME = body.smb_username
-        changed.append("SMB_USERNAME")
-
-    if body.smb_password is not None and body.smb_password != "":
-        env["SMB_PASSWORD"] = body.smb_password
-        settings.SMB_PASSWORD = body.smb_password
-        changed.append("SMB_PASSWORD")
-
-    if body.smb_shares is not None:
-        shares = [s.strip() for s in body.smb_shares if s.strip()]
-        env["SMB_SHARES"] = ",".join(shares)
-        settings.SMB_SHARES = shares
-        changed.append("SMB_SHARES")
 
     if body.scan_concurrency is not None:
         env["SCAN_CONCURRENCY"] = str(body.scan_concurrency)
