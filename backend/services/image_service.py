@@ -21,14 +21,41 @@ for tag, name in ExifTags.TAGS.items():
 
 
 def compute_hash(data: bytes | None = None, file_path: str | None = None) -> str:
+    """Compute a fast identity hash: first 64KB + last 64KB + file size.
+    Must match A-Eye's hashing logic for API lookups to work.
+    """
     sha256 = hashlib.sha256()
+    
     if file_path:
-        with open(file_path, "rb") as f:
-            while chunk := f.read(8192):
-                sha256.update(chunk)
-    elif data:
-        sha256.update(data)
-    return sha256.hexdigest()
+        try:
+            size = os.path.getsize(file_path)
+            sha256.update(str(size).encode())
+            
+            chunk_size = 65536 # 64KB
+            with open(file_path, "rb") as f:
+                # First 64KB
+                sha256.update(f.read(chunk_size))
+                
+                # Last 64KB
+                if size > chunk_size * 2:
+                    f.seek(-chunk_size, 2)
+                    sha256.update(f.read(chunk_size))
+            return sha256.hexdigest()
+        except Exception:
+            return ""
+
+    if data:
+        size = len(data)
+        sha256.update(str(size).encode())
+        chunk_size = 65536
+        # First chunk
+        sha256.update(data[:chunk_size])
+        # Last chunk
+        if size > chunk_size * 2:
+            sha256.update(data[-chunk_size:])
+        return sha256.hexdigest()
+
+    return ""
 
 
 def correct_orientation(img: Image.Image) -> tuple[Image.Image, bool]:
