@@ -223,15 +223,36 @@ function MainApp() {
 }
 
 function ProtectedRoute() {
-  const [authenticated, setAuthenticated] = useState(isAuthenticated())
+  // "checking" shows a loading screen while we verify the token with the server.
+  // This prevents a flash of the gallery when the JWT secret changed (e.g. container restart).
+  const [authState, setAuthState] = useState(() => isAuthenticated() ? "checking" : "unauthenticated")
 
   useEffect(() => {
-    const handler = () => setAuthenticated(false)
-    window.addEventListener("eyeris-auth-require", handler)
-    return () => window.removeEventListener("eyeris-auth-require", handler)
+    const unauth = () => {
+      localStorage.removeItem("eyeris_auth_token")
+      setAuthState("unauthenticated")
+    }
+    window.addEventListener("eyeris-auth-require", unauth)
+
+    if (authState === "checking") {
+      const token = localStorage.getItem("eyeris_auth_token") || ""
+      fetch("/auth/verify", { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => {
+          if (r.ok) {
+            setAuthState("authenticated")
+          } else {
+            localStorage.removeItem("eyeris_auth_token")
+            setAuthState("unauthenticated")
+          }
+        })
+        .catch(() => setAuthState("authenticated")) // network error — assume ok
+    }
+
+    return () => window.removeEventListener("eyeris-auth-require", unauth)
   }, [])
 
-  if (!authenticated) return <Login onLogin={() => setAuthenticated(true)} />
+  if (authState === "checking") return <LoadingScreen />
+  if (authState !== "authenticated") return <Login onLogin={() => setAuthState("authenticated")} />
   return (
     <ErrorBoundary fallback={ErrorFallback}>
       <MainApp />

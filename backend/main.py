@@ -223,7 +223,19 @@ app.mount("/thumbnails", StaticFiles(directory=settings.THUMBNAIL_DIR), name="th
 # Static frontend (production)
 frontend_path = os.path.join(settings.REPO_ROOT, "frontend", "dist")
 if os.path.exists(frontend_path):
-    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+    # Serve the compiled JS/CSS bundle directory
+    assets_dir = os.path.join(frontend_path, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    # Catch-all: serve any existing file (favicon, logos, etc.) or fall back to
+    # index.html so that React Router can handle all client-side paths (/login, etc.)
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        file_path = os.path.join(frontend_path, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_path, "index.html"))
 else:
     @app.get("/")
     async def root():

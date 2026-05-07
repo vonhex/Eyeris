@@ -1,9 +1,13 @@
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import bcrypt
+
+_security = HTTPBearer(auto_error=False)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -153,6 +157,24 @@ def login(body: LoginRequest):
         raise HTTPException(status_code=500, detail=f"Token generation failed: {e}")
 
     return {"token": token}
+
+
+@router.get("/verify")
+def verify_token(credentials: Optional[HTTPAuthorizationCredentials] = Depends(_security)):
+    """Verify that the supplied JWT is still valid for this server instance."""
+    raw = credentials.credentials if credentials else None
+    if not raw:
+        raise HTTPException(status_code=401, detail="No token")
+    env = _read_env()
+    secret_key = env.get("EYERIS_SECRET_KEY", "")
+    if not secret_key:
+        raise HTTPException(status_code=401, detail="Not configured")
+    try:
+        import jwt as pyjwt
+        pyjwt.decode(raw, secret_key, algorithms=["HS256"])
+        return {"valid": True}
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
 @router.post("/logout")
