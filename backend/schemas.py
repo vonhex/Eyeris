@@ -60,6 +60,13 @@ class ImageSummary(BaseModel):
     date_taken: datetime | None = None
     location_name: str | None = None
     camera_model: str | None = None
+    # Shooting data (Summary)
+    lens_model: str | None = None
+    aperture: float | None = None
+    shutter_speed: str | None = None
+    iso: int | None = None
+    focal_length: float | None = None
+    flash: str | None = None
     quality_flags: str | None = None  # JSON string
     is_video: bool = False
     created_at: datetime
@@ -75,11 +82,6 @@ class ImageDetail(ImageSummary):
     orientation_corrected: bool
     gps_lat: float | None = None
     gps_lon: float | None = None
-    lens_model: str | None = None
-    aperture: float | None = None
-    shutter_speed: str | None = None
-    iso: int | None = None
-    focal_length: float | None = None
     updated_at: datetime
 
 
