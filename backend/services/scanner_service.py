@@ -52,8 +52,20 @@ async def _load_metadata_from_aeye(rel_path: str, file_hash: str | None = None) 
                 # A-Eye schema: camera_model, exif_raw (json string in DB, dict in API)
                 raw = data.get("exif_raw") or {}
                 
-                # Debug: print keys to see what we're working with
-                if not raw:
+                # Robustly handle exif_raw if it arrived as a string
+                if isinstance(raw, str):
+                    try:
+                        import json
+                        raw = json.loads(raw)
+                    except Exception:
+                        raw = {}
+                
+                # Debug: print count of keys
+                if raw:
+                    # Only log if it's unusually small, suggesting shallow extraction
+                    if len(raw) < 10:
+                        print(f"[A-Eye API] Warning: only {len(raw)} tags found for {rel_path}")
+                else:
                     print(f"[A-Eye API] Found record for {rel_path} but exif_raw was empty.")
                 
                 return {
@@ -523,7 +535,7 @@ async def _discover_image(db: Session, img_info: dict):
         
         # Aperture (33437)
         if not new_img.aperture:
-            val = _get_exif_val(raw, ["EXIF FNumber", "Image FNumber"])
+            val = _get_exif_val(raw, ["EXIF FNumber", "Image FNumber", "FNumber"])
             if val:
                 try:
                     if "/" in val:
@@ -536,14 +548,14 @@ async def _discover_image(db: Session, img_info: dict):
             
         # Shutter (33434)
         if not new_img.shutter_speed:
-            val = _get_exif_val(raw, ["EXIF ExposureTime", "Image ExposureTime"])
+            val = _get_exif_val(raw, ["EXIF ExposureTime", "Image ExposureTime", "ExposureTime"])
             if val:
                 new_img.shutter_speed = val
                 enriched_fields.append("shutter")
             
         # ISO (34855)
         if not new_img.iso:
-            val = _get_exif_val(raw, ["EXIF ISOSpeedRatings", "Image ISOSpeedRatings"])
+            val = _get_exif_val(raw, ["EXIF ISOSpeedRatings", "Image ISOSpeedRatings", "ISOSpeedRatings"])
             if val:
                 try:
                     new_img.iso = int(val)
@@ -552,7 +564,7 @@ async def _discover_image(db: Session, img_info: dict):
             
         # Focal Length (37386)
         if not new_img.focal_length:
-            val = _get_exif_val(raw, ["EXIF FocalLength", "Image FocalLength"])
+            val = _get_exif_val(raw, ["EXIF FocalLength", "Image FocalLength", "FocalLength"])
             if val:
                 try:
                     if "/" in val:
@@ -565,14 +577,14 @@ async def _discover_image(db: Session, img_info: dict):
             
         # Lens Model (42036)
         if not new_img.lens_model:
-            val = _get_exif_val(raw, ["EXIF LensModel", "Image LensModel"])
+            val = _get_exif_val(raw, ["EXIF LensModel", "Image LensModel", "LensModel", "MakerNote LensModel", "MakerNote LensType"])
             if val:
                 new_img.lens_model = val
                 enriched_fields.append("lens")
 
         # Flash (37385)
         if not hasattr(new_img, 'flash') or not new_img.flash:
-            val = _get_exif_val(raw, ["EXIF Flash", "Image Flash"])
+            val = _get_exif_val(raw, ["EXIF Flash", "Image Flash", "Flash"])
             if val:
                 new_img.flash = val
                 enriched_fields.append("flash")
@@ -720,7 +732,7 @@ async def run_full_resync() -> int:
                     
                     # Aperture (33437)
                     if not img_record.aperture:
-                        val = _get_exif_val(raw, ["EXIF FNumber", "Image FNumber"])
+                        val = _get_exif_val(raw, ["EXIF FNumber", "Image FNumber", "FNumber"])
                         if val:
                             try:
                                 if "/" in val:
@@ -733,14 +745,14 @@ async def run_full_resync() -> int:
                         
                     # Shutter (33434)
                     if not img_record.shutter_speed:
-                        val = _get_exif_val(raw, ["EXIF ExposureTime", "Image ExposureTime"])
+                        val = _get_exif_val(raw, ["EXIF ExposureTime", "Image ExposureTime", "ExposureTime"])
                         if val:
                             img_record.shutter_speed = val
                             enriched_fields.append("shutter")
                         
                     # ISO (34855)
                     if not img_record.iso:
-                        val = _get_exif_val(raw, ["EXIF ISOSpeedRatings", "Image ISOSpeedRatings"])
+                        val = _get_exif_val(raw, ["EXIF ISOSpeedRatings", "Image ISOSpeedRatings", "ISOSpeedRatings"])
                         if val:
                             try:
                                 img_record.iso = int(val)
@@ -749,7 +761,7 @@ async def run_full_resync() -> int:
                         
                     # Focal Length (37386)
                     if not img_record.focal_length:
-                        val = _get_exif_val(raw, ["EXIF FocalLength", "Image FocalLength"])
+                        val = _get_exif_val(raw, ["EXIF FocalLength", "Image FocalLength", "FocalLength"])
                         if val:
                             try:
                                 if "/" in val:
@@ -762,14 +774,14 @@ async def run_full_resync() -> int:
                         
                     # Lens Model (42036)
                     if not img_record.lens_model:
-                        val = _get_exif_val(raw, ["EXIF LensModel", "Image LensModel"])
+                        val = _get_exif_val(raw, ["EXIF LensModel", "Image LensModel", "LensModel", "MakerNote LensModel", "MakerNote LensType"])
                         if val:
                             img_record.lens_model = val
                             enriched_fields.append("lens")
 
                     # Flash (37385)
                     if not hasattr(img_record, 'flash') or not img_record.flash:
-                        val = _get_exif_val(raw, ["EXIF Flash", "Image Flash"])
+                        val = _get_exif_val(raw, ["EXIF Flash", "Image Flash", "Flash"])
                         if val:
                             img_record.flash = val
                             enriched_fields.append("flash")
