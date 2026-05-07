@@ -49,8 +49,15 @@ const navItems = [
 function isAuthenticated() {
   const token = localStorage.getItem("eyeris_auth_token")
   if (!token || token === "ready") return false
-  // JWT tokens are three dot-separated base64 segments, minimum length ~30
-  return typeof token === "string" && token.includes(".") && token.length > 30
+  if (typeof token !== "string" || !token.includes(".") || token.length <= 30) return false
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]))
+    if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) {
+      localStorage.removeItem("eyeris_auth_token")
+      return false
+    }
+  } catch {}
+  return true
 }
 
 import { getScanStatus, stopScan } from "./api"
@@ -217,6 +224,13 @@ function MainApp() {
 
 function ProtectedRoute() {
   const [authenticated, setAuthenticated] = useState(isAuthenticated())
+
+  useEffect(() => {
+    const handler = () => setAuthenticated(false)
+    window.addEventListener("eyeris-auth-require", handler)
+    return () => window.removeEventListener("eyeris-auth-require", handler)
+  }, [])
+
   if (!authenticated) return <Login onLogin={() => setAuthenticated(true)} />
   return (
     <ErrorBoundary fallback={ErrorFallback}>

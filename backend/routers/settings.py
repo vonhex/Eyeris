@@ -83,6 +83,9 @@ def apply_json_settings():
             settings.SCAN_SCHEDULE_ENABLED = v
             os.environ["SCAN_SCHEDULE_ENABLED"] = "true" if v else "false"
         elif hasattr(settings, key):
+            # Don't let an empty JSON value overwrite a non-empty Docker env var
+            if val == "" and os.environ.get(key, ""):
+                continue
             setattr(settings, key, val)
             os.environ[key] = str(val)
 
