@@ -41,6 +41,10 @@ class Image(Base):
     shutter_speed = Column(String(32), nullable=True)  # e.g. "1/125"
     iso = Column(Integer, nullable=True)
     focal_length = Column(Float, nullable=True)    # mm
+    flash = Column(String(100), nullable=True)
+    # AI Analysis
+    sentiment = Column(String(50), nullable=True, index=True)
+    sentiment_score = Column(Float, nullable=True)
     is_video = Column(Boolean, default=False, nullable=False, server_default="0", index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

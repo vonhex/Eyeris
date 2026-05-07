@@ -134,6 +134,21 @@ function DetailContent({ image, categories, fetchImage, togglingFav, onToggleFav
               </dd>
             </div>
           )}
+          {image.flash && (
+            <div className="flex justify-between">
+              <dt className="text-gray-500">Flash</dt>
+              <dd className="text-gray-300 text-right">{image.flash}</dd>
+            </div>
+          )}
+          {image.sentiment && (
+            <div className="flex justify-between">
+              <dt className="text-gray-500">Mood</dt>
+              <dd className="text-gray-300 text-right capitalize">
+                {image.sentiment} 
+                {image.sentiment_score != null && ` (${Math.round(image.sentiment_score * 100)}%)`}
+              </dd>
+            </div>
+          )}
           {image.gps_lat != null && image.gps_lon != null && (
             <div className="flex justify-between">
               <dt className="text-gray-500">GPS</dt>
