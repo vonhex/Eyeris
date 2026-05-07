@@ -52,6 +52,10 @@ async def _load_metadata_from_aeye(rel_path: str, file_hash: str | None = None) 
                 # A-Eye schema: camera_model, exif_raw (json string in DB, dict in API)
                 raw = data.get("exif_raw") or {}
                 
+                # Debug: print keys to see what we're working with
+                if not raw:
+                    print(f"[A-Eye API] Found record for {rel_path} but exif_raw was empty.")
+                
                 return {
                     "camera_model": data.get("camera_model"),
                     "gps_lat": data.get("gps_lat"),
@@ -59,11 +63,21 @@ async def _load_metadata_from_aeye(rel_path: str, file_hash: str | None = None) 
                     "date_taken": data.get("exif_date"),
                     "raw_exif": raw
                 }
+            elif resp.status_code != 404:
+                print(f"[A-Eye API] unexpected status {resp.status_code} for {rel_path}")
     except Exception as e:
         # Don't log 404s as errors, they just mean A-Eye hasn't seen the file yet
         if not (hasattr(e, 'response') and e.response.status_code == 404):
             print(f"[A-Eye API] Failed to fetch metadata for {rel_path}: {e}")
     
+    return None
+
+
+def _get_exif_val(raw: dict, keys: list[str]) -> str | None:
+    """Helper to try multiple possible EXIF tag names."""
+    for k in keys:
+        if k in raw and raw[k]:
+            return str(raw[k])
     return None
 
 
@@ -508,50 +522,59 @@ async def _discover_image(db: Session, img_info: dict):
         raw = aeye_meta.get("raw_exif") or {}
         
         # Aperture (33437)
-        if not new_img.aperture and "EXIF FNumber" in raw:
-            try:
-                val = str(raw["EXIF FNumber"])
-                if "/" in val:
-                    n, d = map(float, val.split("/"))
-                    new_img.aperture = round(n/d, 1)
-                else:
-                    new_img.aperture = float(val)
-                enriched_fields.append("aperture")
-            except Exception: pass
+        if not new_img.aperture:
+            val = _get_exif_val(raw, ["EXIF FNumber", "Image FNumber"])
+            if val:
+                try:
+                    if "/" in val:
+                        n, d = map(float, val.split("/"))
+                        new_img.aperture = round(n/d, 1)
+                    else:
+                        new_img.aperture = float(val)
+                    enriched_fields.append("aperture")
+                except Exception: pass
             
         # Shutter (33434)
-        if not new_img.shutter_speed and "EXIF ExposureTime" in raw:
-            new_img.shutter_speed = str(raw["EXIF ExposureTime"])
-            enriched_fields.append("shutter")
+        if not new_img.shutter_speed:
+            val = _get_exif_val(raw, ["EXIF ExposureTime", "Image ExposureTime"])
+            if val:
+                new_img.shutter_speed = val
+                enriched_fields.append("shutter")
             
         # ISO (34855)
-        if not new_img.iso and "EXIF ISOSpeedRatings" in raw:
-            try:
-                new_img.iso = int(str(raw["EXIF ISOSpeedRatings"]))
-                enriched_fields.append("iso")
-            except Exception: pass
+        if not new_img.iso:
+            val = _get_exif_val(raw, ["EXIF ISOSpeedRatings", "Image ISOSpeedRatings"])
+            if val:
+                try:
+                    new_img.iso = int(val)
+                    enriched_fields.append("iso")
+                except Exception: pass
             
         # Focal Length (37386)
-        if not new_img.focal_length and "EXIF FocalLength" in raw:
-            try:
-                val = str(raw["EXIF FocalLength"])
-                if "/" in val:
-                    n, d = map(float, val.split("/"))
-                    new_img.focal_length = round(n/d, 1)
-                else:
-                    new_img.focal_length = float(val)
-                enriched_fields.append("focal")
-            except Exception: pass
+        if not new_img.focal_length:
+            val = _get_exif_val(raw, ["EXIF FocalLength", "Image FocalLength"])
+            if val:
+                try:
+                    if "/" in val:
+                        n, d = map(float, val.split("/"))
+                        new_img.focal_length = round(n/d, 1)
+                    else:
+                        new_img.focal_length = float(val)
+                    enriched_fields.append("focal")
+                except Exception: pass
             
         # Lens Model (42036)
-        if not new_img.lens_model and "EXIF LensModel" in raw:
-            new_img.lens_model = str(raw["EXIF LensModel"])
-            enriched_fields.append("lens")
+        if not new_img.lens_model:
+            val = _get_exif_val(raw, ["EXIF LensModel", "Image LensModel"])
+            if val:
+                new_img.lens_model = val
+                enriched_fields.append("lens")
 
         # Flash (37385)
         if not hasattr(new_img, 'flash') or not new_img.flash:
-            if "EXIF Flash" in raw:
-                new_img.flash = str(raw["EXIF Flash"])
+            val = _get_exif_val(raw, ["EXIF Flash", "Image Flash"])
+            if val:
+                new_img.flash = val
                 enriched_fields.append("flash")
 
         if enriched_fields:
@@ -696,50 +719,59 @@ async def run_full_resync() -> int:
                     raw = aeye_meta.get("raw_exif") or {}
                     
                     # Aperture (33437)
-                    if not img_record.aperture and "EXIF FNumber" in raw:
-                        try:
-                            val = str(raw["EXIF FNumber"])
-                            if "/" in val:
-                                n, d = map(float, val.split("/"))
-                                img_record.aperture = round(n/d, 1)
-                            else:
-                                img_record.aperture = float(val)
-                            enriched_fields.append("aperture")
-                        except Exception: pass
+                    if not img_record.aperture:
+                        val = _get_exif_val(raw, ["EXIF FNumber", "Image FNumber"])
+                        if val:
+                            try:
+                                if "/" in val:
+                                    n, d = map(float, val.split("/"))
+                                    img_record.aperture = round(n/d, 1)
+                                else:
+                                    img_record.aperture = float(val)
+                                enriched_fields.append("aperture")
+                            except Exception: pass
                         
                     # Shutter (33434)
-                    if not img_record.shutter_speed and "EXIF ExposureTime" in raw:
-                        img_record.shutter_speed = str(raw["EXIF ExposureTime"])
-                        enriched_fields.append("shutter")
+                    if not img_record.shutter_speed:
+                        val = _get_exif_val(raw, ["EXIF ExposureTime", "Image ExposureTime"])
+                        if val:
+                            img_record.shutter_speed = val
+                            enriched_fields.append("shutter")
                         
                     # ISO (34855)
-                    if not img_record.iso and "EXIF ISOSpeedRatings" in raw:
-                        try:
-                            img_record.iso = int(str(raw["EXIF ISOSpeedRatings"]))
-                            enriched_fields.append("iso")
-                        except Exception: pass
+                    if not img_record.iso:
+                        val = _get_exif_val(raw, ["EXIF ISOSpeedRatings", "Image ISOSpeedRatings"])
+                        if val:
+                            try:
+                                img_record.iso = int(val)
+                                enriched_fields.append("iso")
+                            except Exception: pass
                         
                     # Focal Length (37386)
-                    if not img_record.focal_length and "EXIF FocalLength" in raw:
-                        try:
-                            val = str(raw["EXIF FocalLength"])
-                            if "/" in val:
-                                n, d = map(float, val.split("/"))
-                                img_record.focal_length = round(n/d, 1)
-                            else:
-                                img_record.focal_length = float(val)
-                            enriched_fields.append("focal")
-                        except Exception: pass
+                    if not img_record.focal_length:
+                        val = _get_exif_val(raw, ["EXIF FocalLength", "Image FocalLength"])
+                        if val:
+                            try:
+                                if "/" in val:
+                                    n, d = map(float, val.split("/"))
+                                    img_record.focal_length = round(n/d, 1)
+                                else:
+                                    img_record.focal_length = float(val)
+                                enriched_fields.append("focal")
+                            except Exception: pass
                         
                     # Lens Model (42036)
-                    if not img_record.lens_model and "EXIF LensModel" in raw:
-                        img_record.lens_model = str(raw["EXIF LensModel"])
-                        enriched_fields.append("lens")
+                    if not img_record.lens_model:
+                        val = _get_exif_val(raw, ["EXIF LensModel", "Image LensModel"])
+                        if val:
+                            img_record.lens_model = val
+                            enriched_fields.append("lens")
 
                     # Flash (37385)
                     if not hasattr(img_record, 'flash') or not img_record.flash:
-                        if "EXIF Flash" in raw:
-                            img_record.flash = str(raw["EXIF Flash"])
+                        val = _get_exif_val(raw, ["EXIF Flash", "Image Flash"])
+                        if val:
+                            img_record.flash = val
                             enriched_fields.append("flash")
 
                     if enriched_fields:
