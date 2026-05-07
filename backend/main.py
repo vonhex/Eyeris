@@ -97,7 +97,7 @@ async def lifespan(app_instance: FastAPI):
             if "crop_path" not in face_cols:
                 conn.execute(text("ALTER TABLE faces ADD COLUMN crop_path VARCHAR(512) NULL"))
                 print("[Startup] Added faces.crop_path")
-            # Add missing indexes
+            
             face_indexes = {idx["name"] for idx in inspector.get_indexes("faces")}
             if "ignored" not in face_cols:
                 conn.execute(text("ALTER TABLE faces ADD COLUMN ignored TINYINT(1) NOT NULL DEFAULT 0"))
@@ -121,6 +121,7 @@ async def lifespan(app_instance: FastAPI):
                 print("[Startup] Added index ix_faces_crop_path")
     except Exception as e:
         print(f"[Startup] Face migration: {e}")
+
     try:
         from sqlalchemy import text, inspect as sa_inspect
         inspector = sa_inspect(engine)
@@ -160,115 +161,73 @@ async def lifespan(app_instance: FastAPI):
                     conn.execute(text("ALTER TABLE images ADD INDEX ix_images_is_video (is_video)"))
                 print("[Startup] Added images.is_video")
             
+            # Additional shooting and analysis columns
             for col, definition in [
                 ("lens_model", "VARCHAR(255) NULL"),
                 ("aperture", "FLOAT NULL"),
                 ("shutter_speed", "VARCHAR(32) NULL"),
                 ("iso", "INT NULL"),
                 ("focal_length", "FLOAT NULL"),
+                ("flash", "VARCHAR(100) NULL"),
+                ("sentiment", "VARCHAR(50) NULL"),
+                ("sentiment_score", "FLOAT NULL"),
             ]:
                 if col not in img_cols:
                     conn.execute(text(f"ALTER TABLE images ADD COLUMN {col} {definition}"))
                     print(f"[Startup] Added images.{col}")
 
-            # Backfill is_video based on filename extensions
-            v_exts = "('.mp4', '.mkv', '.avi', '.mov', '.wmv', '.webm', '.m4v')"
-            for ext in [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".m4v"]:
-                res = conn.execute(text(f"UPDATE images SET is_video = 1 WHERE filename LIKE '%{ext}' AND is_video = 0"))
-                if res.rowcount > 0:
-                    print(f"[Startup] Backfilled is_video=1 for {res.rowcount} {ext} files")
     except Exception as e:
         print(f"[Startup] Image migration: {e}")
 
-    # Backfill location_name for images that have GPS coords but no location yet
-    try:
-        import asyncio as _asyncio
-        from database import SessionLocal as _SessionLocal
-        from models import Image as _Image
-        import reverse_geocode as _rg
-
-        async def _backfill_locations():
-            db = _SessionLocal()
-            try:
-                rows = (
-                    db.query(_Image.id, _Image.gps_lat, _Image.gps_lon)
-                    .filter(_Image.gps_lat.isnot(None), _Image.location_name.is_(None))
-                    .all()
-                )
-                if not rows:
-                    return
-                print(f"[Startup] Backfilling location names for {len(rows)} images…")
-                coords = [(r.gps_lat, r.gps_lon) for r in rows]
-                results = _rg.search(coords)
-                for row, geo in zip(rows, results):
-                    city = geo.get("city", "")
-                    country = geo.get("country", "")
-                    name = ", ".join(filter(None, [city, country]))
-                    if name:
-                        db.query(_Image).filter(_Image.id == row.id).update({"location_name": name})
-                db.commit()
-                print(f"[Startup] Location backfill complete.")
-            except Exception as e:
-                print(f"[Startup] Location backfill error: {e}")
-            finally:
-                db.close()
-
-        _asyncio.create_task(_backfill_locations())
-    except Exception as e:
-        print(f"[Startup] Location backfill setup error: {e}")
-
-    await start_background_scanner()
-    print("[Startup] Background scanner started")
-    await start_watcher()
-    print("[Startup] File watcher started")
-    await start_aeye_xmp_poll()
-    print("[Startup] A-Eye XMP poll loop started")
+    # Start background services
+    asyncio.create_task(start_background_scanner())
+    asyncio.create_task(start_aeye_xmp_poll())
+    asyncio.create_task(start_watcher())
+    
     yield
-    # Shutdown
     print("[Shutdown] App shutting down")
 
 
 app = FastAPI(
-    title="Image Catalog",
-    description="AI-powered image categorization from NAS storage",
-    version="1.2.0",
-    lifespan=lifespan,
+    title="Eyeris API",
+    version="1.0.0",
+    lifespan=lifespan
 )
 
-
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Routes
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(images.router, prefix="/api/images", tags=["images"], dependencies=[Depends(_verify_token)])
+app.include_router(tags.router, prefix="/api/tags", tags=["tags"], dependencies=[Depends(_verify_token)])
+app.include_router(categories.router, prefix="/api/categories", tags=["categories"], dependencies=[Depends(_verify_token)])
+app.include_router(scan.router, prefix="/api/scan", tags=["scan"], dependencies=[Depends(_verify_token)])
+app.include_router(stats.router, prefix="/api/stats", tags=["stats"], dependencies=[Depends(_verify_token)])
+app.include_router(albums.router, prefix="/api/albums", tags=["albums"], dependencies=[Depends(_verify_token)])
+app.include_router(faces.router, prefix="/api/faces", tags=["faces"], dependencies=[Depends(_verify_token)])
+app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"], dependencies=[Depends(_verify_token)])
+app.include_router(searxng.router, prefix="/api/searxng", tags=["searxng"], dependencies=[Depends(_verify_token)])
+app.include_router(aeye.router, prefix="/api/aeye", tags=["aeye"], dependencies=[Depends(_verify_token)])
 
-# Route registration — auth routes are public, all others require JWT token
-app.include_router(auth.router)
+# Thumbnails
+app.mount("/thumbnails", StaticFiles(directory=settings.THUMBNAIL_DIR), name="thumbnails")
 
-for _router in [images.router, tags.router, categories.router, scan.router,
-                stats.router, albums.router, faces.router, settings_router.router, searxng.router,
-                aeye.router]:
-    app.include_router(_router, dependencies=[Depends(_verify_token)])
+# Static frontend (production)
+frontend_path = os.path.join(settings.REPO_ROOT, "frontend", "dist")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+else:
+    @app.get("/")
+    async def root():
+        return {"message": "Eyeris API is running. Frontend build not found."}
 
-
-@app.get("/api/health")
-def health():
-    return {"status": "ok"}
-
-
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
-
-# Serve React frontend in production
-if os.path.isdir(FRONTEND_DIR):
-    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="static")
-
-    @app.get("/{full_path:path}")
-    async def serve_frontend(request: Request, full_path: str):
-        # Serve index.html for all non-API routes (SPA client-side routing)
-        file_path = os.path.join(FRONTEND_DIR, full_path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
-        return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
