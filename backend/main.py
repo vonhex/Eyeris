@@ -205,17 +205,17 @@ app.add_middleware(
 )
 
 # Routes
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(images.router, prefix="/api/images", tags=["images"], dependencies=[Depends(_verify_token)])
-app.include_router(tags.router, prefix="/api/tags", tags=["tags"], dependencies=[Depends(_verify_token)])
-app.include_router(categories.router, prefix="/api/categories", tags=["categories"], dependencies=[Depends(_verify_token)])
-app.include_router(scan.router, prefix="/api/scan", tags=["scan"], dependencies=[Depends(_verify_token)])
-app.include_router(stats.router, prefix="/api/stats", tags=["stats"], dependencies=[Depends(_verify_token)])
-app.include_router(albums.router, prefix="/api/albums", tags=["albums"], dependencies=[Depends(_verify_token)])
-app.include_router(faces.router, prefix="/api/faces", tags=["faces"], dependencies=[Depends(_verify_token)])
-app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"], dependencies=[Depends(_verify_token)])
-app.include_router(searxng.router, prefix="/api/searxng", tags=["searxng"], dependencies=[Depends(_verify_token)])
-app.include_router(aeye.router, prefix="/api/aeye", tags=["aeye"], dependencies=[Depends(_verify_token)])
+app.include_router(auth.router)
+app.include_router(images.router, dependencies=[Depends(_verify_token)])
+app.include_router(tags.router, dependencies=[Depends(_verify_token)])
+app.include_router(categories.router, dependencies=[Depends(_verify_token)])
+app.include_router(scan.router, dependencies=[Depends(_verify_token)])
+app.include_router(stats.router, dependencies=[Depends(_verify_token)])
+app.include_router(albums.router, dependencies=[Depends(_verify_token)])
+app.include_router(faces.router, dependencies=[Depends(_verify_token)])
+app.include_router(settings_router.router, dependencies=[Depends(_verify_token)])
+app.include_router(searxng.router, dependencies=[Depends(_verify_token)])
+app.include_router(aeye.router, dependencies=[Depends(_verify_token)])
 
 # Thumbnails
 app.mount("/thumbnails", StaticFiles(directory=settings.THUMBNAIL_DIR), name="thumbnails")
