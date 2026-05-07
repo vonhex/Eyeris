@@ -205,7 +205,7 @@ app.add_middleware(
 )
 
 # Routes
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(images.router, prefix="/api/images", tags=["images"], dependencies=[Depends(_verify_token)])
 app.include_router(tags.router, prefix="/api/tags", tags=["tags"], dependencies=[Depends(_verify_token)])
 app.include_router(categories.router, prefix="/api/categories", tags=["categories"], dependencies=[Depends(_verify_token)])
