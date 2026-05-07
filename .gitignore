@@ -32,3 +32,4 @@ data/
 
 # Screenshots
 Screenshot*.png
+ollama-proxy.py
