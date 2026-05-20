@@ -19,6 +19,9 @@ from services.scanner_service import (
 
 router = APIRouter(prefix="/api/scan", tags=["scan"])
 
+# GPS backfill state
+_gps_backfill_state: dict = {"running": False, "total": 0, "done": 0, "updated": 0}
+
 
 @router.get("/status")
 def scan_status(db: Session = Depends(get_db)):
@@ -67,12 +70,18 @@ async def start_scan():
     return {"status": "ok", "message": "Scan started"}
 
 
+@router.get("/gps-backfill-status")
+def gps_backfill_status():
+    return _gps_backfill_state
+
+
 @router.post("/backfill-gps")
 async def backfill_gps(db: Session = Depends(get_db)):
     """Re-extract GPS coordinates from EXIF for all images that are missing them."""
     from models import Image as ImageModel
-    from services.image_service import extract_gps
-    from services.smb_service import read_file_bytes
+
+    if _gps_backfill_state["running"]:
+        return {"status": "ok", "message": "GPS backfill already running"}
 
     images = db.query(ImageModel).filter(
         ImageModel.gps_lat.is_(None),
@@ -94,7 +103,11 @@ async def _run_gps_backfill(images):
     from PIL import Image as PILImage
     from io import BytesIO
 
-    updated = 0
+    _gps_backfill_state["running"] = True
+    _gps_backfill_state["total"] = len(images)
+    _gps_backfill_state["done"] = 0
+    _gps_backfill_state["updated"] = 0
+
     for img in images:
         try:
             parts = img.file_path.split("/", 1)
@@ -123,13 +136,16 @@ async def _run_gps_backfill(images):
                         if location_name and not record.location_name:
                             record.location_name = location_name
                         db.commit()
-                        updated += 1
+                        _gps_backfill_state["updated"] += 1
                 finally:
                     db.close()
         except Exception as e:
             print(f"[GPS backfill] Failed for image {img.id}: {e}")
+        finally:
+            _gps_backfill_state["done"] += 1
 
-    print(f"[GPS backfill] Complete — updated {updated} images")
+    print(f"[GPS backfill] Complete — updated {_gps_backfill_state['updated']} images")
+    _gps_backfill_state["running"] = False
 
 
 @router.post("/resync")

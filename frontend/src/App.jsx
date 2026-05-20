@@ -62,7 +62,7 @@ function isAuthenticated() {
   return true
 }
 
-import { getScanStatus, stopScan } from "./api"
+import { getScanStatus, stopScan, getGpsBackfillStatus } from "./api"
 
 function LoadingScreen() {
   return (
@@ -150,6 +150,37 @@ function PhashStatusBar() {
   )
 }
 
+function GpsBackfillStatusBar() {
+  const [state, setState] = useState(null)
+
+  useEffect(() => {
+    const poll = () => getGpsBackfillStatus().then(setState).catch(() => {})
+    poll()
+    const interval = setInterval(poll, 2000)
+    return () => clearInterval(interval)
+  }, [])
+
+  if (!state || !state.running) return null
+
+  const { total, done, updated } = state
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+
+  return (
+    <div className="bg-green-950 border-b border-green-800 px-4 py-2 flex items-center gap-3">
+      <span className="text-xs text-green-300 font-medium shrink-0">GPS Backfill</span>
+      <div className="flex-1 bg-green-900 rounded-full h-1.5 overflow-hidden">
+        <div
+          className={`h-1.5 rounded-full transition-all duration-500 ${total === 0 ? "bg-green-500 animate-pulse w-full" : "bg-green-400"}`}
+          style={total > 0 ? { width: `${pct}%` } : undefined}
+        />
+      </div>
+      <span className="text-xs text-green-400 shrink-0">
+        {total > 0 ? `${done.toLocaleString()} / ${total.toLocaleString()} — ${updated.toLocaleString()} found (${pct}%)` : "Starting…"}
+      </span>
+    </div>
+  )
+}
+
 function AppNavLink({ to, label }) {
   const location = useLocation()
   const target = new URL(to, "http://x")
@@ -204,6 +235,7 @@ function MainApp() {
         </div>
       </nav>
       <PhashStatusBar />
+      <GpsBackfillStatusBar />
       <main className="flex-1">
         <Suspense fallback={<LoadingScreen />} key={location.pathname}>
           <Routes>
