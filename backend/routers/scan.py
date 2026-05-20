@@ -75,6 +75,40 @@ def gps_backfill_status():
     return _gps_backfill_state
 
 
+@router.get("/debug-gps/{image_id}")
+async def debug_gps(image_id: int, db: Session = Depends(get_db)):
+    """Read one image and return exactly what GPS data PIL sees in its EXIF."""
+    from models import Image as ImageModel
+    from services.smb_service import read_file_bytes
+    from PIL import Image as PILImage
+    from io import BytesIO
+
+    img = db.query(ImageModel).filter(ImageModel.id == image_id).first()
+    if not img:
+        return {"error": "image not found"}
+
+    try:
+        parts = img.file_path.split("/", 1)
+        share, rel = parts[0], parts[1] if len(parts) > 1 else ""
+        data = await asyncio.to_thread(read_file_bytes, share, rel)
+    except Exception as e:
+        return {"error": f"could not read file: {e}", "file_path": img.file_path}
+
+    try:
+        pil_img = PILImage.open(BytesIO(data))
+        exif = pil_img.getexif()
+        gps_ifd = exif.get_ifd(34853)
+        return {
+            "file_path": img.file_path,
+            "format": pil_img.format,
+            "exif_keys": list(exif.keys()),
+            "has_gps_ifd": bool(gps_ifd),
+            "gps_ifd": {str(k): str(v) for k, v in gps_ifd.items()},
+        }
+    except Exception as e:
+        return {"error": f"PIL error: {e}", "file_path": img.file_path}
+
+
 @router.post("/backfill-gps")
 async def backfill_gps(db: Session = Depends(get_db)):
     """Re-extract GPS coordinates from EXIF for all images that are missing them."""
