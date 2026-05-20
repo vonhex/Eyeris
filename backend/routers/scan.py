@@ -71,7 +71,7 @@ async def start_scan():
 async def backfill_gps(db: Session = Depends(get_db)):
     """Re-extract GPS coordinates from EXIF for all images that are missing them."""
     from models import Image as ImageModel
-    from services.image_service import extract_gps, open_image_bytes
+    from services.image_service import extract_gps
     from services.smb_service import read_file_bytes
 
     images = db.query(ImageModel).filter(
