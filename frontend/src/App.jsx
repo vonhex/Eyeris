@@ -30,6 +30,7 @@ import Settings from "./pages/Settings"
 import ImageSearch from "./pages/ImageSearch"
 import Duplicates from "./pages/Duplicates"
 import Blurry from "./pages/Blurry"
+import Map from "./pages/Map"
 import Login from "./pages/Login"
 
 const navItems = [
@@ -41,6 +42,7 @@ const navItems = [
   { to: "/folders", label: "Folders" },
   { to: "/duplicates", label: "Duplicates" },
   { to: "/blurry", label: "Blurry" },
+  { to: "/map", label: "Map" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/search", label: "Web Search" },
   { to: "/settings", label: "Settings" },
@@ -214,6 +216,7 @@ function MainApp() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/duplicates" element={<Duplicates />} />
             <Route path="/blurry" element={<Blurry />} />
+            <Route path="/map" element={<Map />} />
           </Routes>
         </Suspense>
       </main>
