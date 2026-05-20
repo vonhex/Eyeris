@@ -39,7 +39,7 @@ export default function Map() {
       try {
         let all = []
         let page = 1
-        const pageSize = 500
+        const pageSize = 200
         while (true) {
           const resp = await getImages({ has_gps: true, page, page_size: pageSize })
           all = all.concat(resp.images)
