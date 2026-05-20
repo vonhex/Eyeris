@@ -67,6 +67,71 @@ async def start_scan():
     return {"status": "ok", "message": "Scan started"}
 
 
+@router.post("/backfill-gps")
+async def backfill_gps(db: Session = Depends(get_db)):
+    """Re-extract GPS coordinates from EXIF for all images that are missing them."""
+    from models import Image as ImageModel
+    from services.image_service import extract_gps, open_image_bytes
+    from services.smb_service import read_file_bytes
+
+    images = db.query(ImageModel).filter(
+        ImageModel.gps_lat.is_(None),
+        ImageModel.is_video == False,
+    ).all()
+
+    if not images:
+        return {"status": "ok", "updated": 0, "message": "No images need GPS backfill"}
+
+    asyncio.create_task(_run_gps_backfill(images))
+    return {"status": "ok", "message": f"GPS backfill started for {len(images)} images"}
+
+
+async def _run_gps_backfill(images):
+    from database import SessionLocal
+    from models import Image as ImageModel
+    from services.image_service import extract_gps
+    from services.smb_service import read_file_bytes
+    from PIL import Image as PILImage
+    from io import BytesIO
+
+    updated = 0
+    for img in images:
+        try:
+            parts = img.file_path.split("/", 1)
+            share = parts[0]
+            rel = parts[1] if len(parts) > 1 else ""
+            data = await asyncio.to_thread(read_file_bytes, share, rel)
+            pil_img = PILImage.open(BytesIO(data))
+            lat, lon = extract_gps(pil_img)
+            if lat is not None and lon is not None:
+                location_name = None
+                try:
+                    import reverse_geocode
+                    result = reverse_geocode.search([(lat, lon)])
+                    if result:
+                        city = result[0].get("city", "")
+                        country = result[0].get("country", "")
+                        location_name = ", ".join(filter(None, [city, country]))
+                except Exception:
+                    pass
+                db = SessionLocal()
+                try:
+                    record = db.query(ImageModel).filter(ImageModel.id == img.id).first()
+                    if record:
+                        record.gps_lat = lat
+                        record.gps_lon = lon
+                        if location_name and not record.location_name:
+                            record.location_name = location_name
+                        db.commit()
+                        updated += 1
+                finally:
+                    db.close()
+        except Exception as e:
+            print(f"[GPS backfill] Failed for image {img.id}: {e}")
+
+    print(f"[GPS backfill] Complete — updated {updated} images")
+
+
 @router.post("/resync")
 async def resync():
     """Trigger a full re-sync of all image metadata, XMP tags, and missing thumbnails."""

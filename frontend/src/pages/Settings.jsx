@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react"
-import { getSettings, updateSettings, resetDatabase, changePassword } from "../api"
+import { getSettings, updateSettings, resetDatabase, changePassword, startGpsBackfill } from "../api"
 
 export default function Settings() {
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [backfillingGps, setBackfillingGps] = useState(false)
   const [message, setMessage] = useState(null)
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
@@ -236,6 +237,32 @@ export default function Settings() {
             {changingPassword ? "Updating…" : "Update Password"}
           </button>
         </form>
+      </div>
+
+      {/* GPS Backfill */}
+      <div className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+        <h3 className="text-lg font-medium text-white mb-1">Backfill GPS Data</h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Re-extract GPS coordinates from EXIF for all images that are missing location data.
+          Runs in the background — check the Map page after a few minutes.
+        </p>
+        <button
+          onClick={async () => {
+            setBackfillingGps(true)
+            setMessage(null)
+            try {
+              const res = await startGpsBackfill()
+              setMessage({ type: "success", text: res.message })
+            } catch (err) {
+              setMessage({ type: "error", text: "Failed to start GPS backfill" })
+            }
+            setBackfillingGps(false)
+          }}
+          disabled={backfillingGps}
+          className="px-4 py-2 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition"
+        >
+          {backfillingGps ? "Starting…" : "Backfill GPS from EXIF"}
+        </button>
       </div>
 
       {/* Danger Zone */}

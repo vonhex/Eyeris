@@ -48,6 +48,7 @@ export const setImageFavorite = (id, favorite) => api.put(`/images/${id}/favorit
 export const getDuplicates = (threshold = 8) => api.get("/images/duplicates", { params: { threshold } }).then((r) => r.data)
 export const startPhashScan = () => api.post("/scan/phash").then((r) => r.data)
 export const startXmpResync = () => api.post("/scan/xmp-resync").then((r) => r.data)
+export const startGpsBackfill = () => api.post("/scan/backfill-gps").then((r) => r.data)
 export const getSentiments = () => api.get("/stats/sentiments").then((r) => r.data)
 export const getFolders = () => api.get("/stats/folders").then((r) => r.data)
 export const getLocations = () => api.get("/stats/locations").then((r) => r.data)
