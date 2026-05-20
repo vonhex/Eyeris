@@ -94,20 +94,30 @@ async def debug_gps(image_id: int, db: Session = Depends(get_db)):
         return {"error": f"could not read file: {e}", "file_path": img.file_path}
 
     try:
-        import exifread
-        tags_detail = exifread.process_file(BytesIO(data), details=True)
-        tags_no_detail = exifread.process_file(BytesIO(data), details=False)
+        import re as _re
+        # Extract embedded XMP from JPEG APP1 segment
+        xmp_match = _re.search(b'<x:xmpmeta.*?</x:xmpmeta>', data, _re.DOTALL)
+        xmp_str = xmp_match.group(0).decode("utf-8", errors="replace") if xmp_match else None
+
+        gps_in_xmp = {}
+        if xmp_str:
+            for tag in ("GPSLatitude", "GPSLongitude", "GPSLatitudeRef", "GPSLongitudeRef"):
+                m = _re.search(rf'(?:exif:{tag}|{tag})[=\s>"\']+([^<\s"\']+)', xmp_str)
+                if m:
+                    gps_in_xmp[tag] = m.group(1)
+
         from services.image_service import extract_gps_from_bytes
         lat, lon = extract_gps_from_bytes(data)
         return {
             "file_path": img.file_path,
             "extracted_lat": lat,
             "extracted_lon": lon,
-            "all_tags_details_true": {k: str(v) for k, v in tags_detail.items()},
-            "all_tags_details_false": {k: str(v) for k, v in tags_no_detail.items()},
+            "has_embedded_xmp": xmp_str is not None,
+            "gps_in_xmp": gps_in_xmp,
+            "xmp_snippet": xmp_str[:2000] if xmp_str else None,
         }
     except Exception as e:
-        return {"error": f"exifread error: {e}", "file_path": img.file_path}
+        return {"error": f"debug error: {e}", "file_path": img.file_path}
 
 
 @router.post("/backfill-gps")
