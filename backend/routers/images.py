@@ -35,6 +35,8 @@ def _image_to_summary(img: Image) -> ImageSummary:
         favorite=img.favorite,
         date_taken=img.date_taken,
         location_name=img.location_name,
+        gps_lat=img.gps_lat,
+        gps_lon=img.gps_lon,
         camera_model=img.camera_model,
         lens_model=img.lens_model,
         aperture=img.aperture,
