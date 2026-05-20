@@ -32,6 +32,7 @@ function FitBounds({ points }) {
 export default function Map() {
   const [images, setImages] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -47,6 +48,8 @@ export default function Map() {
           page++
         }
         setImages(all)
+      } catch (err) {
+        setError(err?.response?.data?.detail || err?.message || String(err))
       } finally {
         setLoading(false)
       }
@@ -61,6 +64,15 @@ export default function Map() {
     return (
       <div className="flex items-center justify-center h-96 text-gray-400 text-lg animate-pulse">
         Loading map…
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 gap-3 text-red-400">
+        <p className="text-lg font-medium">Failed to load map</p>
+        <pre className="text-sm bg-gray-900 rounded p-4 max-w-xl text-red-300 whitespace-pre-wrap">{error}</pre>
       </div>
     )
   }
