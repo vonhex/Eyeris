@@ -54,7 +54,8 @@ export default function Map() {
     load()
   }, [])
 
-  const points = images.map((img) => [img.gps_lat, img.gps_lon])
+  const validImages = images.filter((img) => img.gps_lat != null && img.gps_lon != null)
+  const points = validImages.map((img) => [img.gps_lat, img.gps_lon])
 
   if (loading) {
     return (
@@ -64,7 +65,7 @@ export default function Map() {
     )
   }
 
-  if (images.length === 0) {
+  if (validImages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-96 gap-3 text-gray-400">
         <svg className="w-12 h-12 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,7 +82,7 @@ export default function Map() {
     <div className="flex flex-col h-[calc(100vh-57px)]">
       <div className="px-6 py-3 bg-gray-900 border-b border-gray-800 flex items-center gap-3 shrink-0">
         <span className="text-white font-medium">Photo Map</span>
-        <span className="text-gray-400 text-sm">{images.length.toLocaleString()} photo{images.length !== 1 ? "s" : ""} with location</span>
+        <span className="text-gray-400 text-sm">{validImages.length.toLocaleString()} photo{validImages.length !== 1 ? "s" : ""} with location</span>
       </div>
       <div className="flex-1">
         <MapContainer
@@ -95,7 +96,7 @@ export default function Map() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <FitBounds points={points} />
-          {images.map((img) => (
+          {validImages.map((img) => (
             <Marker key={img.id} position={[img.gps_lat, img.gps_lon]}>
               <Popup>
                 <div className="flex flex-col items-center gap-2" style={{ minWidth: 160 }}>
