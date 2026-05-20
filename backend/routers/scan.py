@@ -95,15 +95,16 @@ async def debug_gps(image_id: int, db: Session = Depends(get_db)):
 
     try:
         import exifread
-        tags = exifread.process_file(BytesIO(data), details=False)
-        gps_tags = {k: str(v) for k, v in tags.items() if k.startswith("GPS")}
+        tags_detail = exifread.process_file(BytesIO(data), details=True)
+        tags_no_detail = exifread.process_file(BytesIO(data), details=False)
         from services.image_service import extract_gps_from_bytes
         lat, lon = extract_gps_from_bytes(data)
         return {
             "file_path": img.file_path,
-            "gps_tags": gps_tags,
             "extracted_lat": lat,
             "extracted_lon": lon,
+            "all_tags_details_true": {k: str(v) for k, v in tags_detail.items()},
+            "all_tags_details_false": {k: str(v) for k, v in tags_no_detail.items()},
         }
     except Exception as e:
         return {"error": f"exifread error: {e}", "file_path": img.file_path}
