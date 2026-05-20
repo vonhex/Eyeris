@@ -80,7 +80,6 @@ async def debug_gps(image_id: int, db: Session = Depends(get_db)):
     """Read one image and return exactly what GPS data PIL sees in its EXIF."""
     from models import Image as ImageModel
     from services.smb_service import read_file_bytes
-    from PIL import Image as PILImage
     from io import BytesIO
 
     img = db.query(ImageModel).filter(ImageModel.id == image_id).first()
@@ -95,18 +94,19 @@ async def debug_gps(image_id: int, db: Session = Depends(get_db)):
         return {"error": f"could not read file: {e}", "file_path": img.file_path}
 
     try:
-        pil_img = PILImage.open(BytesIO(data))
-        exif = pil_img.getexif()
-        gps_ifd = exif.get_ifd(34853)
+        import exifread
+        tags = exifread.process_file(BytesIO(data), details=False)
+        gps_tags = {k: str(v) for k, v in tags.items() if k.startswith("GPS")}
+        from services.image_service import extract_gps_from_bytes
+        lat, lon = extract_gps_from_bytes(data)
         return {
             "file_path": img.file_path,
-            "format": pil_img.format,
-            "exif_keys": list(exif.keys()),
-            "has_gps_ifd": bool(gps_ifd),
-            "gps_ifd": {str(k): str(v) for k, v in gps_ifd.items()},
+            "gps_tags": gps_tags,
+            "extracted_lat": lat,
+            "extracted_lon": lon,
         }
     except Exception as e:
-        return {"error": f"PIL error: {e}", "file_path": img.file_path}
+        return {"error": f"exifread error: {e}", "file_path": img.file_path}
 
 
 @router.post("/backfill-gps")
@@ -132,10 +132,8 @@ async def backfill_gps(db: Session = Depends(get_db)):
 async def _run_gps_backfill(images):
     from database import SessionLocal
     from models import Image as ImageModel
-    from services.image_service import extract_gps
+    from services.image_service import extract_gps_from_bytes
     from services.smb_service import read_file_bytes
-    from PIL import Image as PILImage
-    from io import BytesIO
 
     _gps_backfill_state["running"] = True
     _gps_backfill_state["total"] = len(images)
@@ -148,8 +146,7 @@ async def _run_gps_backfill(images):
             share = parts[0]
             rel = parts[1] if len(parts) > 1 else ""
             data = await asyncio.to_thread(read_file_bytes, share, rel)
-            pil_img = PILImage.open(BytesIO(data))
-            lat, lon = extract_gps(pil_img)
+            lat, lon = extract_gps_from_bytes(data)
             if lat is not None and lon is not None:
                 location_name = None
                 try:

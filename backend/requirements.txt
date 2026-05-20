@@ -13,3 +13,4 @@ watchfiles
 imagehash
 bcrypt
 PyJWT
+exifread

@@ -151,6 +151,45 @@ def extract_gps(img: Image.Image) -> tuple[float | None, float | None]:
         return None, None
 
 
+def extract_gps_from_bytes(data: bytes) -> tuple[float | None, float | None]:
+    """Extract GPS using exifread, which handles far more EXIF variants than PIL.
+    Falls back to PIL if exifread is unavailable.
+    """
+    try:
+        import exifread
+        from io import BytesIO
+
+        def _rational_to_dec(values) -> float:
+            total = 0.0
+            for i, v in enumerate(values):
+                n, d = (v.num, v.den) if hasattr(v, "num") else (int(str(v).split("/")[0]), int(str(v).split("/")[1]) if "/" in str(v) else 1)
+                total += (n / d) / (60.0 ** i)
+            return total
+
+        tags = exifread.process_file(BytesIO(data), details=False)
+        lat_tag = tags.get("GPS GPSLatitude")
+        lat_ref = tags.get("GPS GPSLatitudeRef")
+        lon_tag = tags.get("GPS GPSLongitude")
+        lon_ref = tags.get("GPS GPSLongitudeRef")
+
+        if not (lat_tag and lat_ref and lon_tag and lon_ref):
+            return None, None
+
+        lat = _rational_to_dec(lat_tag.values)
+        lon = _rational_to_dec(lon_tag.values)
+        if str(lat_ref) == "S":
+            lat = -lat
+        if str(lon_ref) == "W":
+            lon = -lon
+        return lat, lon
+    except ImportError:
+        from io import BytesIO
+        from PIL import Image as _PIL
+        return extract_gps(_PIL.open(BytesIO(data)))
+    except Exception:
+        return None, None
+
+
 def extract_shooting_data(img: Image.Image) -> dict:
     """Extract aperture, shutter speed, ISO, focal length, and lens model from EXIF."""
     result = {"aperture": None, "shutter_speed": None, "iso": None, "focal_length": None, "lens_model": None}
