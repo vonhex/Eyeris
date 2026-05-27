@@ -75,6 +75,92 @@ def gps_backfill_status():
     return _gps_backfill_state
 
 
+@router.get("/gps-diagnose")
+async def gps_diagnose(db: Session = Depends(get_db)):
+    """Sample 10 real (non-tmp) images spread across the library and report GPS extraction results."""
+    import re as _re
+    import traceback
+    from models import Image as ImageModel
+    from services.smb_service import read_file_bytes
+    from services.image_service import extract_gps_from_bytes
+
+    # Pick non-tmp, non-video images spread across the full ID range
+    candidates = (
+        db.query(ImageModel)
+        .filter(
+            ImageModel.is_video == False,
+            ~ImageModel.filename.like("tmp_%"),
+        )
+        .order_by(ImageModel.id)
+        .all()
+    )
+
+    if not candidates:
+        return {"error": "No non-tmp images found in DB"}
+
+    # Sample evenly: pick ~10 images spread across the list
+    total = len(candidates)
+    step = max(1, total // 10)
+    sample = [candidates[i] for i in range(0, total, step)][:10]
+
+    results = []
+    for img in sample:
+        entry = {
+            "id": img.id,
+            "filename": img.filename,
+            "file_path": img.file_path,
+            "camera_model": img.camera_model,
+            "db_gps_lat": img.gps_lat,
+            "db_gps_lon": img.gps_lon,
+        }
+        try:
+            parts = img.file_path.split("/", 1)
+            share, rel = parts[0], parts[1] if len(parts) > 1 else ""
+            data = await asyncio.to_thread(read_file_bytes, share, rel)
+            entry["file_size"] = len(data)
+
+            # Check how many EXIF tags exifread finds
+            try:
+                import exifread
+                from io import BytesIO as _BIO
+                tags = exifread.process_file(_BIO(data), details=False)
+                gps_keys = [k for k in tags if k.startswith("GPS")]
+                entry["exifread_total_tags"] = len(tags)
+                entry["exifread_gps_keys"] = gps_keys
+                entry["exifread_gps_values"] = {k: str(tags[k]) for k in gps_keys}
+            except Exception as ex:
+                entry["exifread_error"] = str(ex)
+
+            # Check for embedded XMP GPS
+            xmp_match = _re.search(b'<x:xmpmeta.*?</x:xmpmeta>', data, _re.DOTALL)
+            if xmp_match:
+                xmp_str = xmp_match.group(0).decode("utf-8", errors="replace")
+                gps_in_xmp = {}
+                for tag in ("GPSLatitude", "GPSLongitude", "GPSLatitudeRef", "GPSLongitudeRef"):
+                    m = _re.search(rf'(?:exif:{tag}|{tag})[=\s>"\']+([^<\s"\']+)', xmp_str)
+                    if m:
+                        gps_in_xmp[tag] = m.group(1)
+                entry["xmp_gps"] = gps_in_xmp
+            else:
+                entry["xmp_gps"] = None
+
+            lat, lon = extract_gps_from_bytes(data)
+            entry["extracted_lat"] = lat
+            entry["extracted_lon"] = lon
+
+        except Exception as ex:
+            entry["read_error"] = str(ex)
+            entry["traceback"] = traceback.format_exc()
+
+        results.append(entry)
+
+    return {
+        "total_non_tmp_images": total,
+        "sample_size": len(results),
+        "results": results,
+    }
+
+
 @router.get("/debug-gps/{image_id}")
 async def debug_gps(image_id: int, db: Session = Depends(get_db)):
     """Read one image and return exactly what GPS data PIL sees in its EXIF."""
@@ -151,22 +237,13 @@ async def _run_gps_backfill(images):
     _gps_backfill_state["done"] = 0
     _gps_backfill_state["updated"] = 0
 
-    # Log the first 20 images in detail so we can diagnose failures
-    DEBUG_LIMIT = 20
-    debugged = 0
-
     print(f"[GPS backfill] Starting — {len(images)} images to process")
 
     for img in images:
-        debug = debugged < DEBUG_LIMIT
-        label = f"id={img.id} {img.filename}" if debug else ""
         try:
             parts = img.file_path.split("/", 1)
             share = parts[0]
             rel = parts[1] if len(parts) > 1 else ""
-
-            if debug:
-                print(f"[GPS backfill] [{debugged+1}/{DEBUG_LIMIT}] Reading {img.file_path}")
 
             try:
                 data = await asyncio.to_thread(read_file_bytes, share, rel)
@@ -174,14 +251,7 @@ async def _run_gps_backfill(images):
                 print(f"[GPS backfill] READ ERROR id={img.id} {img.filename}: {read_err}")
                 continue
 
-            if debug:
-                print(f"[GPS backfill] Read OK — {len(data)} bytes")
-
-            lat, lon = extract_gps_from_bytes(data, _debug_label=label if debug else "")
-
-            if debug:
-                print(f"[GPS backfill] Result: lat={lat} lon={lon}")
-                debugged += 1
+            lat, lon = extract_gps_from_bytes(data)
 
             if lat is not None and lon is not None:
                 location_name = None
@@ -208,8 +278,7 @@ async def _run_gps_backfill(images):
                 finally:
                     db.close()
         except Exception as e:
-            import traceback
-            print(f"[GPS backfill] EXCEPTION id={img.id} {img.filename}: {e}\n{traceback.format_exc()}")
+            print(f"[GPS backfill] EXCEPTION id={img.id} {img.filename}: {e}")
         finally:
             _gps_backfill_state["done"] += 1
 
