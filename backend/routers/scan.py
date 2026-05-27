@@ -84,24 +84,57 @@ async def gps_diagnose(db: Session = Depends(get_db)):
     from services.smb_service import read_file_bytes
     from services.image_service import extract_gps_from_bytes
 
-    # Pick non-tmp, non-video images spread across the full ID range
-    candidates = (
+    # Priority 1: Apple/iPhone camera model
+    apple = (
         db.query(ImageModel)
         .filter(
             ImageModel.is_video == False,
-            ~ImageModel.filename.like("tmp_%"),
+            ImageModel.camera_model.ilike("%apple%"),
         )
         .order_by(ImageModel.id)
+        .limit(200)
         .all()
     )
 
-    if not candidates:
-        return {"error": "No non-tmp images found in DB"}
+    # Priority 2: JPEG files with any camera model
+    jpeg_with_cam = (
+        db.query(ImageModel)
+        .filter(
+            ImageModel.is_video == False,
+            ImageModel.camera_model.isnot(None),
+            ImageModel.filename.ilike("%.jp%"),
+        )
+        .order_by(ImageModel.id)
+        .limit(200)
+        .all()
+    )
 
-    # Sample evenly: pick ~10 images spread across the list
-    total = len(candidates)
+    # Priority 3: Any JPEG
+    any_jpeg = (
+        db.query(ImageModel)
+        .filter(
+            ImageModel.is_video == False,
+            ImageModel.filename.ilike("%.jp%"),
+            ~ImageModel.filename.like("tmp_%"),
+        )
+        .order_by(ImageModel.id)
+        .limit(200)
+        .all()
+    )
+
+    pool = apple or jpeg_with_cam or any_jpeg
+    if not pool:
+        return {"error": "No JPEG/iPhone images found in DB at all"}
+
+    total = len(pool)
     step = max(1, total // 10)
-    sample = [candidates[i] for i in range(0, total, step)][:10]
+    sample = [pool[i] for i in range(0, total, step)][:10]
+
+    pool_description = (
+        "Apple/iPhone camera model" if apple
+        else "JPEG with any camera model" if jpeg_with_cam
+        else "any JPEG (no camera model set)"
+    )
 
     results = []
     for img in sample:
@@ -155,7 +188,8 @@ async def gps_diagnose(db: Session = Depends(get_db)):
         results.append(entry)
 
     return {
-        "total_non_tmp_images": total,
+        "pool_description": pool_description,
+        "pool_size": total,
         "sample_size": len(results),
         "results": results,
     }
