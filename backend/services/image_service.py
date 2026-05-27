@@ -151,10 +151,13 @@ def extract_gps(img: Image.Image) -> tuple[float | None, float | None]:
         return None, None
 
 
-def extract_gps_from_bytes(data: bytes) -> tuple[float | None, float | None]:
+def extract_gps_from_bytes(data: bytes, _debug_label: str = "") -> tuple[float | None, float | None]:
     """Extract GPS using exifread, which handles far more EXIF variants than PIL.
     Falls back to PIL if exifread is unavailable.
+    _debug_label: if set, emit detailed diagnostic prints prefixed with this label.
     """
+    tag_prefix = f"[GPS-DBG {_debug_label}]" if _debug_label else ""
+
     try:
         import exifread
         from io import BytesIO
@@ -167,29 +170,54 @@ def extract_gps_from_bytes(data: bytes) -> tuple[float | None, float | None]:
             return total
 
         tags = exifread.process_file(BytesIO(data), details=False)
+
+        if tag_prefix:
+            gps_keys = [k for k in tags if k.startswith("GPS")]
+            print(f"{tag_prefix} exifread found {len(tags)} tags total, GPS keys: {gps_keys}")
+
         lat_tag = tags.get("GPS GPSLatitude")
         lat_ref = tags.get("GPS GPSLatitudeRef")
         lon_tag = tags.get("GPS GPSLongitude")
         lon_ref = tags.get("GPS GPSLongitudeRef")
 
+        if tag_prefix:
+            print(f"{tag_prefix} lat_tag={lat_tag!r} lat_ref={lat_ref!r} lon_tag={lon_tag!r} lon_ref={lon_ref!r}")
+
         if not (lat_tag and lon_tag):
-            return None, None
+            if tag_prefix:
+                print(f"{tag_prefix} MISSING lat/lon tags — no GPS in this file")
+            # Fallback: try PIL IFD
+            pil_lat, pil_lon = extract_gps(Image.open(BytesIO(data)))
+            if tag_prefix:
+                print(f"{tag_prefix} PIL fallback result: lat={pil_lat} lon={pil_lon}")
+            return pil_lat, pil_lon
 
         lat = _rational_to_dec(lat_tag.values)
         lon = _rational_to_dec(lon_tag.values)
+        if tag_prefix:
+            print(f"{tag_prefix} decoded raw: lat={lat} lon={lon}")
         if lat_ref and str(lat_ref).strip() == "S":
             lat = -lat
         if lon_ref and str(lon_ref).strip() == "W":
             lon = -lon
         # Sanity check — valid coordinates
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            if tag_prefix:
+                print(f"{tag_prefix} SANITY FAIL: lat={lat} lon={lon} out of range")
             return None, None
+        if tag_prefix:
+            print(f"{tag_prefix} SUCCESS: lat={lat} lon={lon}")
         return lat, lon
     except ImportError:
+        if tag_prefix:
+            print(f"{tag_prefix} exifread not installed — using PIL fallback")
         from io import BytesIO
         from PIL import Image as _PIL
         return extract_gps(_PIL.open(BytesIO(data)))
-    except Exception:
+    except Exception as exc:
+        if tag_prefix:
+            import traceback
+            print(f"{tag_prefix} EXCEPTION: {exc}\n{traceback.format_exc()}")
         return None, None
 
 

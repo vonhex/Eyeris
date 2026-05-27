@@ -151,13 +151,38 @@ async def _run_gps_backfill(images):
     _gps_backfill_state["done"] = 0
     _gps_backfill_state["updated"] = 0
 
+    # Log the first 20 images in detail so we can diagnose failures
+    DEBUG_LIMIT = 20
+    debugged = 0
+
+    print(f"[GPS backfill] Starting — {len(images)} images to process")
+
     for img in images:
+        debug = debugged < DEBUG_LIMIT
+        label = f"id={img.id} {img.filename}" if debug else ""
         try:
             parts = img.file_path.split("/", 1)
             share = parts[0]
             rel = parts[1] if len(parts) > 1 else ""
-            data = await asyncio.to_thread(read_file_bytes, share, rel)
-            lat, lon = extract_gps_from_bytes(data)
+
+            if debug:
+                print(f"[GPS backfill] [{debugged+1}/{DEBUG_LIMIT}] Reading {img.file_path}")
+
+            try:
+                data = await asyncio.to_thread(read_file_bytes, share, rel)
+            except Exception as read_err:
+                print(f"[GPS backfill] READ ERROR id={img.id} {img.filename}: {read_err}")
+                continue
+
+            if debug:
+                print(f"[GPS backfill] Read OK — {len(data)} bytes")
+
+            lat, lon = extract_gps_from_bytes(data, _debug_label=label if debug else "")
+
+            if debug:
+                print(f"[GPS backfill] Result: lat={lat} lon={lon}")
+                debugged += 1
+
             if lat is not None and lon is not None:
                 location_name = None
                 try:
@@ -179,14 +204,16 @@ async def _run_gps_backfill(images):
                             record.location_name = location_name
                         db.commit()
                         _gps_backfill_state["updated"] += 1
+                        print(f"[GPS backfill] SAVED id={img.id} {img.filename} → {lat:.5f},{lon:.5f} ({location_name or 'no location name'})")
                 finally:
                     db.close()
         except Exception as e:
-            print(f"[GPS backfill] Failed for image {img.id}: {e}")
+            import traceback
+            print(f"[GPS backfill] EXCEPTION id={img.id} {img.filename}: {e}\n{traceback.format_exc()}")
         finally:
             _gps_backfill_state["done"] += 1
 
-    print(f"[GPS backfill] Complete — updated {_gps_backfill_state['updated']} images")
+    print(f"[GPS backfill] Complete — updated {_gps_backfill_state['updated']} / {len(images)} images")
     _gps_backfill_state["running"] = False
 
 
