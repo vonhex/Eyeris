@@ -172,15 +172,18 @@ def extract_gps_from_bytes(data: bytes) -> tuple[float | None, float | None]:
         lon_tag = tags.get("GPS GPSLongitude")
         lon_ref = tags.get("GPS GPSLongitudeRef")
 
-        if not (lat_tag and lat_ref and lon_tag and lon_ref):
+        if not (lat_tag and lon_tag):
             return None, None
 
         lat = _rational_to_dec(lat_tag.values)
         lon = _rational_to_dec(lon_tag.values)
-        if str(lat_ref) == "S":
+        if lat_ref and str(lat_ref).strip() == "S":
             lat = -lat
-        if str(lon_ref) == "W":
+        if lon_ref and str(lon_ref).strip() == "W":
             lon = -lon
+        # Sanity check — valid coordinates
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            return None, None
         return lat, lon
     except ImportError:
         from io import BytesIO
@@ -435,7 +438,8 @@ def process_image_bytes(data: bytes) -> dict:
     # Read EXIF from original (before orientation correction strips tags)
     original = Image.open(BytesIO(data))
     date_taken = extract_date_taken(original)
-    gps_lat, gps_lon = extract_gps(original)
+    # Use exifread-backed extractor — handles iPhone GPS format reliably
+    gps_lat, gps_lon = extract_gps_from_bytes(data)
     camera_model = extract_camera_model(original)
     shooting = extract_shooting_data(original)
 
