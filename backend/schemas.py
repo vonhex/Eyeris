@@ -59,6 +59,8 @@ class ImageSummary(BaseModel):
     favorite: bool = False
     date_taken: datetime | None = None
     location_name: str | None = None
+    gps_lat: float | None = None
+    gps_lon: float | None = None
     camera_model: str | None = None
     # Shooting data (Summary)
     lens_model: str | None = None
