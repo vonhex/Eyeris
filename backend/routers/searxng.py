@@ -61,15 +61,6 @@ def _safe_filename(name: str) -> str:
     return name[:150] or "image"
 
 
-def _safe_subfolder(base: str, subfolder: str) -> str:
-    """Resolve subfolder inside base; refuse anything that escapes it (e.g. '../')."""
-    base_real = os.path.realpath(base)
-    dest = os.path.realpath(os.path.join(base_real, subfolder.lstrip("/\\")))
-    if dest != base_real and not dest.startswith(base_real + os.sep):
-        raise HTTPException(status_code=400, detail="Subfolder must stay inside the library")
-    return dest
-
-
 @router.get("/search")
 async def search_web(
     q: str = Query(..., min_length=1),
@@ -179,7 +170,11 @@ async def download_to_nas(body: DownloadRequest):
         for url in body.urls:
             await _ensure_public_host(url)
 
-        dest_dir = _safe_subfolder(settings.MOUNT_BASE, subfolder)
+        # Confine the destination to the library (refuses ../ and absolute escapes)
+        library = os.path.realpath(settings.MOUNT_BASE)
+        dest_dir = os.path.realpath(os.path.join(library, subfolder.lstrip("/\\")))
+        if not dest_dir.startswith(library + os.sep):
+            raise HTTPException(status_code=400, detail="Subfolder must stay inside the library")
         try:
             os.makedirs(dest_dir, exist_ok=True)
         except Exception as e:
@@ -214,11 +209,12 @@ async def download_to_nas(body: DownloadRequest):
                         filename = (base or "image") + ext
 
                     # Avoid collisions
-                    dest = os.path.join(dest_dir, filename)
-                    if os.path.exists(dest):
+                    if os.path.exists(os.path.join(dest_dir, filename)):
                         base2, ext2 = os.path.splitext(filename)
                         filename = f"{base2}_{int(time.time() * 1000)}{ext2}"
-                        dest = os.path.join(dest_dir, filename)
+                    dest = os.path.realpath(os.path.join(dest_dir, filename))
+                    if not dest.startswith(dest_dir + os.sep):
+                        raise HTTPException(status_code=400, detail="Invalid filename")
 
                     with open(dest, "wb") as f:
                         f.write(resp.content)
@@ -231,9 +227,9 @@ async def download_to_nas(body: DownloadRequest):
                     errors.append({"url": url, "error": reason})
 
         return {"saved": len(saved), "filenames": saved, "errors": errors}
+    except HTTPException:
+        raise  # deliberate refusals (bad subfolder, private address): no traceback
     except Exception as e:
         print(f"[SearXNG] Global download error: {e}")
         traceback.print_exc()
-        if isinstance(e, HTTPException):
-            raise e
         raise HTTPException(status_code=500, detail="Download failed")
