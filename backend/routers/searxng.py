@@ -1,4 +1,8 @@
+import asyncio
+import ipaddress
 import os
+import re
+import socket
 import time
 from urllib.parse import urlparse
 
@@ -13,8 +17,57 @@ router = APIRouter(prefix="/api/searxng", tags=["searxng"])
 
 def _validate_url(url: str):
     parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
         raise HTTPException(status_code=400, detail="Only http/https URLs are allowed")
+
+
+def _is_public_ip(ip: str) -> bool:
+    addr = ipaddress.ip_address(ip)
+    return not (addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved
+                or addr.is_multicast or addr.is_unspecified)
+
+
+async def _ensure_public_host(url: str) -> None:
+    """Refuse URLs whose host resolves to a private, loopback, link-local or reserved address.
+
+    Stops the proxy/download endpoints from being used to reach the LAN, the host
+    itself or cloud metadata services (SSRF). Applied to every request, redirects included.
+    """
+    _validate_url(url)
+    host = urlparse(url).hostname
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(host, None)
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="Host could not be resolved")
+    if not infos or not all(_is_public_ip(info[4][0]) for info in infos):
+        raise HTTPException(status_code=400, detail="Only public internet addresses are allowed")
+
+
+async def _check_request(request: httpx.Request) -> None:
+    await _ensure_public_host(str(request.url))
+
+
+def _public_client(timeout: float) -> httpx.AsyncClient:
+    """httpx client that validates the target of every request, including each redirect hop."""
+    return httpx.AsyncClient(timeout=timeout, follow_redirects=True,
+                             event_hooks={"request": [_check_request]})
+
+
+_SAFE_NAME = re.compile(r"[^A-Za-z0-9._ -]+")
+
+
+def _safe_filename(name: str) -> str:
+    name = _SAFE_NAME.sub("_", os.path.basename(name)).strip(" .")
+    return name[:150] or "image"
+
+
+def _safe_subfolder(base: str, subfolder: str) -> str:
+    """Resolve subfolder inside base; refuse anything that escapes it (e.g. '../')."""
+    base_real = os.path.realpath(base)
+    dest = os.path.realpath(os.path.join(base_real, subfolder.lstrip("/\\")))
+    if dest != base_real and not dest.startswith(base_real + os.sep):
+        raise HTTPException(status_code=400, detail="Subfolder must stay inside the library")
+    return dest
 
 
 @router.get("/search")
@@ -41,7 +94,8 @@ async def search_web(
         except httpx.HTTPStatusError as e:
             raise HTTPException(status_code=502, detail=f"SearXNG returned {e.response.status_code}")
         except Exception as e:
-            raise HTTPException(status_code=502, detail=f"SearXNG unreachable: {e}")
+            print(f"[SearXNG] Search request failed: {e}")
+            raise HTTPException(status_code=502, detail="SearXNG unreachable")
 
     data = resp.json()
     results = []
@@ -81,7 +135,7 @@ async def search_web(
 @router.get("/proxy")
 async def proxy_image(url: str = Query(...), token: str = Query(None)):
     """Proxy an external image URL through the backend to avoid CORS issues."""
-    _validate_url(url)
+    await _ensure_public_host(url)
     parsed = urlparse(url)
     headers = {"User-Agent": "Mozilla/5.0 (compatible)"}
     # Many image hosts check Referer; set it to the parent page URL for sites that require it
@@ -89,11 +143,14 @@ async def proxy_image(url: str = Query(...), token: str = Query(None)):
     if referer:
         headers["Referer"] = referer
 
-    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+    async with _public_client(timeout=15) as client:
         try:
             resp = await client.get(url, headers=headers)
+        except HTTPException:
+            raise
         except Exception as e:
-            raise HTTPException(status_code=502, detail=f"Failed to fetch image: {e}")
+            print(f"[SearXNG] Proxy fetch failed for {url}: {e}")
+            raise HTTPException(status_code=502, detail="Failed to fetch image")
     if resp.status_code >= 400:
         raise HTTPException(status_code=502, detail=f"Remote returned {resp.status_code}")
     content_type = resp.headers.get("content-type", "image/jpeg").split(";")[0].strip()
@@ -120,14 +177,14 @@ async def download_to_nas(body: DownloadRequest):
         subfolder = (body.subfolder or "web-downloads").strip() or "web-downloads"
 
         for url in body.urls:
-            _validate_url(url)
+            await _ensure_public_host(url)
 
-        dest_dir = os.path.join(settings.MOUNT_BASE, subfolder)
+        dest_dir = _safe_subfolder(settings.MOUNT_BASE, subfolder)
         try:
             os.makedirs(dest_dir, exist_ok=True)
         except Exception as e:
             print(f"[SearXNG] Failed to create directory {dest_dir}: {e}")
-            raise HTTPException(status_code=500, detail=f"Could not create destination directory: {e}")
+            raise HTTPException(status_code=500, detail="Could not create destination directory")
 
         EXT_MAP = {
             "image/jpeg": ".jpg",
@@ -141,16 +198,15 @@ async def download_to_nas(body: DownloadRequest):
         saved = []
         errors = []
 
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        async with _public_client(timeout=30) as client:
             for url in body.urls:
                 try:
                     resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible)"})
                     resp.raise_for_status()
 
                     path_part = urlparse(url).path
-                    filename = os.path.basename(path_part) or "image"
-                    # Strip query params that may have crept into the filename
-                    filename = filename.split("?")[0]
+                    # Strip query params, then keep only safe filename characters
+                    filename = _safe_filename(os.path.basename(path_part).split("?")[0])
                     base, ext = os.path.splitext(filename)
                     if ext.lower() not in VALID_EXTS:
                         ct = resp.headers.get("content-type", "").split(";")[0].strip()
@@ -170,7 +226,9 @@ async def download_to_nas(body: DownloadRequest):
                     saved.append(filename)
                 except Exception as e:
                     print(f"[SearXNG] Download failed for {url}: {e}")
-                    errors.append({"url": url, "error": str(e)})
+                    reason = e.detail if isinstance(e, HTTPException) else (
+                        f"HTTP {e.response.status_code}" if isinstance(e, httpx.HTTPStatusError) else "download failed")
+                    errors.append({"url": url, "error": reason})
 
         return {"saved": len(saved), "filenames": saved, "errors": errors}
     except Exception as e:
@@ -178,4 +236,4 @@ async def download_to_nas(body: DownloadRequest):
         traceback.print_exc()
         if isinstance(e, HTTPException):
             raise e
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Download failed")

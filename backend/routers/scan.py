@@ -162,7 +162,8 @@ async def gps_diagnose(db: Session = Depends(get_db)):
                 entry["exifread_gps_keys"] = gps_keys
                 entry["exifread_gps_values"] = {k: str(tags[k]) for k in gps_keys}
             except Exception as ex:
-                entry["exifread_error"] = str(ex)
+                print(f"[GPS debug] exifread failed for {img.file_path}: {ex}")
+                entry["exifread_error"] = "exifread could not parse this file"
 
             # Check for embedded XMP GPS
             xmp_match = _re.search(b'<x:xmpmeta.*?</x:xmpmeta>', data, _re.DOTALL)
@@ -181,9 +182,9 @@ async def gps_diagnose(db: Session = Depends(get_db)):
             entry["extracted_lat"] = lat
             entry["extracted_lon"] = lon
 
-        except Exception as ex:
-            entry["read_error"] = str(ex)
-            entry["traceback"] = traceback.format_exc()
+        except Exception:
+            print(f"[GPS debug] read failed for {img.file_path}:\n{traceback.format_exc()}")
+            entry["read_error"] = "could not read or parse this file (see server log)"
 
         results.append(entry)
 
@@ -211,7 +212,8 @@ async def debug_gps(image_id: int, db: Session = Depends(get_db)):
         share, rel = parts[0], parts[1] if len(parts) > 1 else ""
         data = await asyncio.to_thread(read_file_bytes, share, rel)
     except Exception as e:
-        return {"error": f"could not read file: {e}", "file_path": img.file_path}
+        print(f"[GPS debug] could not read {img.file_path}: {e}")
+        return {"error": "could not read file (see server log)", "file_path": img.file_path}
 
     try:
         import re as _re
@@ -237,7 +239,8 @@ async def debug_gps(image_id: int, db: Session = Depends(get_db)):
             "xmp_snippet": xmp_str[:2000] if xmp_str else None,
         }
     except Exception as e:
-        return {"error": f"debug error: {e}", "file_path": img.file_path}
+        print(f"[GPS debug] XMP inspection failed for {img.file_path}: {e}")
+        return {"error": "debug inspection failed (see server log)", "file_path": img.file_path}
 
 
 @router.post("/backfill-gps")
@@ -415,7 +418,7 @@ def reset_database(db: Session = Depends(get_db)):
         except:
             pass
         print(f"[Reset] DB reset error: {e}")
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": "Database reset failed (see server log)"}
 
     print("[Reset] Database cleared")
     return {"status": "ok", "message": "Database reset complete"}

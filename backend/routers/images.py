@@ -639,7 +639,8 @@ async def bulk_delete_images(body: BulkDeleteRequest, db: Session = Depends(get_
         try:
             await asyncio.to_thread(delete_file, share, rel_path)
         except Exception as e:
-            errors.append(f"{img.filename}: {e}")
+            print(f"[Delete] Could not delete {img.file_path}: {e}")
+            errors.append(f"{img.filename}: delete failed")
             continue
 
         if img.thumbnail_path:

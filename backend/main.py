@@ -65,7 +65,7 @@ async def lifespan(app_instance: FastAPI):
     if not _is_setup_complete():
         try:
             result = _auto_setup()  # sync I/O, FastAPI handles it in thread pool
-            print(f"[Startup] Auto-created account (password: {result.get('password')})")
+            print("[Startup] Auto-created the account with the default password; change it in Settings")
         except HTTPException:
             pass  # already set up by another process/thread
         except Exception as e:
@@ -232,8 +232,10 @@ if os.path.exists(frontend_path):
     # index.html so that React Router can handle all client-side paths (/login, etc.)
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
-        file_path = os.path.join(frontend_path, full_path)
-        if os.path.isfile(file_path):
+        # Only serve files that really live inside the frontend build (no ../ escapes)
+        root = os.path.realpath(frontend_path)
+        file_path = os.path.realpath(os.path.join(root, full_path))
+        if file_path.startswith(root + os.sep) and os.path.isfile(file_path):
             return FileResponse(file_path)
         return FileResponse(os.path.join(frontend_path, "index.html"))
 else:

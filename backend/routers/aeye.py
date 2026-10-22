@@ -126,7 +126,10 @@ def analyze_images(body: dict, db: Session = Depends(get_db)):
                     resp.raise_for_status()
                 sent += 1
             except Exception as exc:
-                errors.append({"id": img.id, "error": str(exc)})
+                logger.warning("A-Eye: failed to send image %s: %s", img.id, exc)
+                reason = (f"A-Eye returned HTTP {exc.response.status_code}"
+                          if isinstance(exc, httpx.HTTPStatusError) else "Could not reach A-Eye")
+                errors.append({"id": img.id, "error": reason})
 
     db.commit()
     return {"sent": sent, "errors": errors}
