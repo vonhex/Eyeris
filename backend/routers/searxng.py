@@ -208,13 +208,19 @@ async def download_to_nas(body: DownloadRequest):
                         ext = EXT_MAP.get(ct, ".jpg")
                         filename = (base or "image") + ext
 
-                    # Avoid collisions
-                    if os.path.exists(os.path.join(dest_dir, filename)):
-                        base2, ext2 = os.path.splitext(filename)
-                        filename = f"{base2}_{int(time.time() * 1000)}{ext2}"
-                    dest = os.path.realpath(os.path.join(dest_dir, filename))
-                    if not dest.startswith(dest_dir + os.sep):
-                        raise HTTPException(status_code=400, detail="Invalid filename")
+                    # Avoid collisions (timestamp suffix), then confirm the final path
+                    base2, ext2 = os.path.splitext(filename)
+                    candidates = (filename, f"{base2}_{int(time.time() * 1000)}{ext2}")
+                    dest = None
+                    for name in candidates:
+                        path = os.path.realpath(os.path.join(dest_dir, name))
+                        if not path.startswith(dest_dir + os.sep):
+                            raise HTTPException(status_code=400, detail="Invalid filename")
+                        if not os.path.exists(path):
+                            dest, filename = path, name
+                            break
+                    if dest is None:
+                        raise HTTPException(status_code=409, detail="File already exists")
 
                     with open(dest, "wb") as f:
                         f.write(resp.content)
