@@ -2,7 +2,7 @@ import json
 import os
 from fastapi import APIRouter
 from pydantic import BaseModel
-from config import settings
+from config import settings, DEFAULT_BLUR_TAGS
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -15,6 +15,7 @@ _JSON_KEYS = [
     "SCAN_SCHEDULE_ENABLED", "SCAN_SCHEDULE_START", "SCAN_SCHEDULE_END",
     "SEARXNG_URL",
     "AEYE_URL", "AEYE_USER", "AEYE_PASS",
+    "BLUR_TAGS",
 ]
 
 
@@ -35,7 +36,7 @@ def _save_settings_json(env: dict):
         for k in _JSON_KEYS:
             if k not in env:
                 continue
-            if k == "SMB_SHARES" and isinstance(env[k], str):
+            if k in ("SMB_SHARES", "BLUR_TAGS") and isinstance(env[k], str):
                 data[k] = [s.strip() for s in env[k].split(",") if s.strip()]
             elif k == "SCAN_CONCURRENCY":
                 data[k] = int(env[k]) if env[k] else 2
@@ -72,6 +73,10 @@ def apply_json_settings():
             v = val if isinstance(val, list) else [s.strip() for s in str(val).split(",") if s.strip()]
             settings.SMB_SHARES = v
             os.environ["SMB_SHARES"] = ",".join(v)
+        elif key == "BLUR_TAGS":
+            v = _normalize_tags(val if isinstance(val, list) else str(val).split(","))
+            settings.BLUR_TAGS = v
+            os.environ["BLUR_TAGS"] = ",".join(v)
         elif key == "SCAN_CONCURRENCY":
             settings.SCAN_CONCURRENCY = int(val)
             os.environ["SCAN_CONCURRENCY"] = str(val)
@@ -88,6 +93,20 @@ def apply_json_settings():
                 continue
             setattr(settings, key, val)
             os.environ[key] = str(val)
+
+
+def _normalize_tags(tags) -> list[str]:
+    """Lowercase (tags are stored lowercase), trim, de-duplicate; empty means the defaults.
+
+    Commas are separators in the .env value, so they cannot be part of a tag.
+    """
+    out: list[str] = []
+    for t in tags:
+        for part in str(t).split(","):
+            name = part.strip().lower()
+            if name and name not in out:
+                out.append(name)
+    return out or list(DEFAULT_BLUR_TAGS)
 
 
 def _read_env() -> dict[str, str]:
@@ -111,6 +130,7 @@ def _write_env(env: dict[str, str]):
         ("# Scanner settings", ["SCAN_CONCURRENCY", "SCAN_INTERVAL_MINUTES"]),
         ("# Scheduled processing window", ["SCAN_SCHEDULE_ENABLED", "SCAN_SCHEDULE_START", "SCAN_SCHEDULE_END"]),
         ("# SearXNG integration", ["SEARXNG_URL"]),
+        ("# Blurry page tags (comma-separated)", ["BLUR_TAGS"]),
         ("# Authentication (auto-generated)", ["EYERIS_SECRET_KEY", "EYERIS_PASSWORD_HASH"]),
     ]
     written_keys = set()
@@ -136,6 +156,7 @@ class SettingsResponse(BaseModel):
     searxng_url: str
     aeye_url: str
     aeye_user: str
+    blur_tags: list[str]
 
 
 class SettingsUpdate(BaseModel):
@@ -148,6 +169,7 @@ class SettingsUpdate(BaseModel):
     aeye_url: str | None = None
     aeye_user: str | None = None
     aeye_pass: str | None = None
+    blur_tags: list[str] | None = None
 
 
 @router.get("", response_model=SettingsResponse)
@@ -161,6 +183,7 @@ def get_settings():
         searxng_url=settings.SEARXNG_URL,
         aeye_url=settings.AEYE_URL,
         aeye_user=settings.AEYE_USER,
+        blur_tags=settings.BLUR_TAGS,
     )
 
 
@@ -213,6 +236,12 @@ def update_settings(body: SettingsUpdate):
         env["AEYE_PASS"] = body.aeye_pass
         settings.AEYE_PASS = body.aeye_pass
         changed.append("AEYE_PASS")
+
+    if body.blur_tags is not None:
+        tags = _normalize_tags(body.blur_tags)
+        env["BLUR_TAGS"] = ",".join(tags)
+        settings.BLUR_TAGS = tags
+        changed.append("BLUR_TAGS")
 
     _write_env(env)
     _save_settings_json(env)

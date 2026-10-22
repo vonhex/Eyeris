@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'), override=True)
 
+DEFAULT_BLUR_TAGS = ("blurry", "blur", "blurred", "out-of-focus", "motion blur")
+
 
 class Settings:
     # Database — SQLite by default (good for Docker/Unraid), MariaDB when DB_HOST is set
@@ -49,6 +51,12 @@ class Settings:
     AEYE_URL: str = os.getenv("AEYE_URL", "")
     AEYE_USER: str = os.getenv("AEYE_USER", "")
     AEYE_PASS: str = os.getenv("AEYE_PASS", "")
+
+    # Tags shown on the Blurry page (comma-separated). Editable in Settings so users
+    # tagging in another language can use e.g. "borrosa,desenfocada".
+    BLUR_TAGS: list[str] = [
+        t.strip().lower() for t in os.getenv("BLUR_TAGS", ",".join(DEFAULT_BLUR_TAGS)).split(",") if t.strip()
+    ] or list(DEFAULT_BLUR_TAGS)
 
     # Scanner
     SCAN_CONCURRENCY: int = int(os.getenv("SCAN_CONCURRENCY", "2"))

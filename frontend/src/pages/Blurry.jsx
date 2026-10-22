@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react"
-import { getImages, bulkDeleteImages, thumbnailUrl } from "../api"
+import { getImages, bulkDeleteImages, thumbnailUrl, getSettings } from "../api"
 
-const BLUR_TAGS = ["blurry", "blur", "blurred", "out-of-focus", "motion blur"]
+// Fallback until settings load; the list is configurable in Settings → Blurry Photos.
+const DEFAULT_BLUR_TAGS = ["blurry", "blur", "blurred", "out-of-focus", "motion blur"]
 const PAGE_SIZE = 100
 
 export default function Blurry() {
@@ -11,8 +12,19 @@ export default function Blurry() {
   const [deleting, setDeleting] = useState(false)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
-  const [activeTag, setActiveTag] = useState("blurry")
+  const [blurTags, setBlurTags] = useState(null)
+  const [activeTag, setActiveTag] = useState(null)
   const [tagCounts, setTagCounts] = useState({})
+
+  useEffect(() => {
+    getSettings()
+      .then((s) => (s.blur_tags?.length ? s.blur_tags : DEFAULT_BLUR_TAGS))
+      .catch(() => DEFAULT_BLUR_TAGS)
+      .then((tags) => {
+        setBlurTags(tags)
+        setActiveTag(tags[0])
+      })
+  }, [])
 
   const load = useCallback(async (tag, p = 1, replace = true) => {
     setLoading(true)
@@ -33,18 +45,19 @@ export default function Blurry() {
     setLoading(false)
   }, [])
 
-  // Load counts for all blur tags on mount
+  // Load counts for all blur tags once the configured list is known
   useEffect(() => {
+    if (!blurTags) return
     Promise.all(
-      BLUR_TAGS.map((tag) =>
+      blurTags.map((tag) =>
         getImages({ tag, page_size: 1, page: 1 })
           .then((d) => [tag, d.total ?? (d.images ?? d).length])
           .catch(() => [tag, 0])
       )
     ).then((entries) => setTagCounts(Object.fromEntries(entries)))
-  }, [])
+  }, [blurTags])
 
-  useEffect(() => { load(activeTag) }, [activeTag, load])
+  useEffect(() => { if (activeTag) load(activeTag) }, [activeTag, load])
 
   const switchTag = (tag) => {
     if (tag === activeTag) return
@@ -78,7 +91,7 @@ export default function Blurry() {
     setDeleting(false)
   }
 
-  const totalBlurry = BLUR_TAGS.reduce((sum, t) => sum + (tagCounts[t] ?? 0), 0)
+  const totalBlurry = (blurTags || []).reduce((sum, t) => sum + (tagCounts[t] ?? 0), 0)
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
@@ -101,7 +114,7 @@ export default function Blurry() {
 
       {/* Tag tabs */}
       <div className="flex gap-2 flex-wrap">
-        {BLUR_TAGS.map((tag) => (
+        {(blurTags || []).map((tag) => (
           <button
             key={tag}
             onClick={() => switchTag(tag)}

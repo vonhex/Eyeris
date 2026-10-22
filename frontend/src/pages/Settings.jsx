@@ -37,6 +37,7 @@ export default function Settings() {
         aeye_url: settings.aeye_url || "",
         aeye_user: settings.aeye_user || "",
         ...(settings.aeye_pass ? { aeye_pass: settings.aeye_pass } : {}),
+        blur_tags: settings.blur_tags || [],
       }
       await updateSettings(payload)
       setMessage({ type: "success", text: "Settings saved. Restart scan for changes to take effect." })
@@ -168,6 +169,21 @@ export default function Settings() {
         </Field>
       </Section>
 
+      {/* Blurry Photos */}
+      <Section title="Blurry Photos">
+        <Field label="Blurry tags">
+          <BlurTagsEditor
+            tags={settings.blur_tags || []}
+            onChange={(blur_tags) => setSettings({ ...settings, blur_tags })}
+          />
+          <p className="text-xs text-gray-600 mt-1">
+            Tags the Blurry page collects photos by. Use the words your AI tags with, in any language
+            (e.g. <span className="text-gray-400">borrosa</span>, <span className="text-gray-400">desenfocada</span>).
+            Press Enter or comma to add a tag.
+          </p>
+        </Field>
+      </Section>
+
       {/* Save */}
       <button
         onClick={handleSave}
@@ -295,6 +311,66 @@ export default function Settings() {
           className="px-4 py-2 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition"
         >
           {resetting ? "Clearing..." : "Start Over / Clear Database"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const DEFAULT_BLUR_TAGS = ["blurry", "blur", "blurred", "out-of-focus", "motion blur"]
+
+function BlurTagsEditor({ tags, onChange }) {
+  const [draft, setDraft] = useState("")
+
+  const add = (raw) => {
+    const next = [...tags]
+    for (const part of raw.split(",")) {
+      const name = part.trim().toLowerCase()
+      if (name && !next.includes(name)) next.push(name)
+    }
+    if (next.length !== tags.length) onChange(next)
+    setDraft("")
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {tags.map((tag) => (
+          <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-800 border border-gray-700 rounded-full text-sm text-gray-200">
+            {tag}
+            <button
+              type="button"
+              onClick={() => onChange(tags.filter((t) => t !== tag))}
+              className="text-gray-500 hover:text-red-400 leading-none"
+              aria-label={`Remove ${tag}`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        {tags.length === 0 && <span className="text-xs text-gray-600">No tags: the defaults will be used.</span>}
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault()
+              add(draft)
+            }
+          }}
+          onBlur={() => draft.trim() && add(draft)}
+          placeholder="Add a tag, e.g. borrosa"
+          className="input-field flex-1"
+        />
+        <button
+          type="button"
+          onClick={() => onChange([...DEFAULT_BLUR_TAGS])}
+          className="px-3 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition"
+        >
+          Reset to defaults
         </button>
       </div>
     </div>
