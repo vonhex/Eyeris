@@ -4,6 +4,13 @@ All notable changes to Eyeris are documented here.
 
 ---
 
+## [1.3.1] — 2026-10-23
+
+### Fixed
+- **Send to A-Eye stopping early:** a run over all untagged items could stop after a few dozen with no error shown. When A-Eye returned the same tag twice for one image, saving it failed and the job quietly ended. Repeated tags are now merged, and a failed item is rolled back, counted as failed and skipped, so the run carries on.
+
+---
+
 ## [1.2.0] — 2026-04-27
 
 ### Added

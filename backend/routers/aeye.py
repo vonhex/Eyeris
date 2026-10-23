@@ -53,11 +53,12 @@ def _apply_aeye_result(db: Session, img: Image, result: dict) -> int:
         img.ai_description = description
         img.analyzed = True
 
+    # Models repeat tags now and then ("night, city, night"). The session does not
+    # autoflush, so a repeat would add the same image_tags row twice and fail the commit.
+    names = list(dict.fromkeys(t.strip().lower() for t in tags_raw if t and t.strip()))
+
     added = 0
-    for tag_name in tags_raw:
-        name = tag_name.strip().lower()
-        if not name:
-            continue
+    for name in names:
         tag = db.query(Tag).filter(Tag.name == name).first()
         if not tag:
             tag = Tag(name=name)
@@ -117,6 +118,7 @@ def analyze_images(body: dict, db: Session = Depends(get_db)):
     sent, errors = 0, []
     with _aeye_client() as client:
         for img in images:
+            img_id = img.id
             try:
                 if img.is_video:
                     _send_thumbnail(client, img, base, db)
@@ -124,12 +126,14 @@ def analyze_images(body: dict, db: Session = Depends(get_db)):
                     rel = _aeye_path(img.file_path)
                     resp = client.post(f"{base}/api/analyze-path", json={"path": rel})
                     resp.raise_for_status()
+                db.commit()
                 sent += 1
             except Exception as exc:
-                logger.warning("A-Eye: failed to send image %s: %s", img.id, exc)
+                db.rollback()
+                logger.warning("A-Eye: failed to send image %s: %s", img_id, exc)
                 reason = (f"A-Eye returned HTTP {exc.response.status_code}"
                           if isinstance(exc, httpx.HTTPStatusError) else "Could not reach A-Eye")
-                errors.append({"id": img.id, "error": reason})
+                errors.append({"id": img_id, "error": reason})
 
     db.commit()
     return {"sent": sent, "errors": errors}
@@ -142,12 +146,16 @@ def _run_analyze_untagged(image_ids: list[int], base: str) -> None:
 
     db = SessionLocal()
     try:
-        images = db.query(Image).filter(Image.id.in_(image_ids)).all()
         with _aeye_client() as client:
-            for img in images:
-                with _job_lock:
-                    _job["current"] = img.filename or str(img.id)
+            # Load each item fresh by id: one failed item rolls the session back, and
+            # objects loaded before that would all need reloading anyway.
+            for image_id in image_ids:
                 try:
+                    img = db.get(Image, image_id)
+                    if img is None:  # deleted since the job was queued
+                        continue
+                    with _job_lock:
+                        _job["current"] = img.filename or str(img.id)
                     # Always use /analyze-image (thumbnail bytes) so A-Eye returns tags
                     # synchronously. /analyze-path only enqueues in A-Eye's own pipeline
                     # and never sends results back to Eyeris.
@@ -157,12 +165,15 @@ def _run_analyze_untagged(image_ids: list[int], base: str) -> None:
                     with _job_lock:
                         _job["done"] += 1
                 except Exception as exc:
-                    logger.warning("A-Eye: failed on image %s: %s", img.id, exc)
+                    # Without the rollback the session stays failed and every later
+                    # item raises too, which used to end the whole job silently.
+                    db.rollback()
+                    logger.warning("A-Eye: failed on image %s: %s", image_id, exc)
                     with _job_lock:
                         _job["errors"] += 1
-        logger.info("A-Eye: completed %d / %d items", _job["done"], len(images))
-    except Exception as exc:
-        logger.error("A-Eye background worker error: %s", exc)
+        logger.info("A-Eye: completed %d / %d items", _job["done"], len(image_ids))
+    except Exception:
+        logger.exception("A-Eye background worker error")
     finally:
         db.close()
         with _job_lock:
