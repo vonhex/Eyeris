@@ -63,17 +63,18 @@ Open **http://localhost:8000** — default username is `eyeris`, password is set
 - **Mobile:** full-screen view, pinch-to-zoom, horizontal swipe to navigate between images, swipe-up bottom sheet to reveal metadata and editing controls
 - Scroll-to-top button appears site-wide when scrolling long pages
 
-### AI Analysis
-- **SigLIP** zero-shot tag classification against ~300 candidates — runs locally on GPU during scan
-- **YOLOv8 + FaceNet** face detection and bounding-box metadata per image
+### AI Tags & Search
+- AI descriptions and tags come from a connected **A-Eye** instance (below). Eyeris itself needs no GPU or local model.
 - **XMP sidecar ingestion**: tags and descriptions written by external tools are read automatically during scan
+- **Search** across tags, AI descriptions, filenames and places, ranked by relevance
+- **Blurry page**: photos tagged blurry, out-of-focus and so on are gathered in one place. Which tags count is configurable under Settings → Blurry Photos.
 
 ### A-Eye Integration
-- Connect to a self-hosted [A-Eye](https://github.com/vonhex/a-eye) instance from the Settings page
-- **Send untagged images and videos to A-Eye** for AI analysis with one click from the Dashboard
+- Connect to a self-hosted [A-Eye](https://github.com/vonhex/a-eye) instance from the Settings page. Use the vonhex fork: it provides the analysis and lookup endpoints Eyeris calls.
+- **Send untagged images and videos to A-Eye** for AI analysis with one click from the Dashboard. Long runs carry on past individual failures; failed items are counted and retried on the next run.
 - Video thumbnails are sent automatically when a video has no tags
 - Tags and descriptions written by A-Eye are **auto-imported every 5 minutes** — no manual re-import needed
-- Supports HTTP Basic Auth for protected A-Eye instances
+- Set the A-Eye username and password in Settings: A-Eye requires them for its metadata lookups
 - A-Eye URL, username, and password persist across container updates
 
 ### Metadata & EXIF
@@ -84,6 +85,7 @@ Open **http://localhost:8000** — default username is `eyeris`, password is set
 - Tag editor per image + bulk tag editor across selections
 - Category and album assignment
 - Duplicate detection via perceptual hash
+- **Web image search** through your SearXNG instance, with one-click download into the library
 
 ### System
 - Two-phase async scan pipeline with live progress bar

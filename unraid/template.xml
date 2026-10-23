@@ -103,4 +103,8 @@
   <GPU support="yes">
     <NVIDIA>true</NVIDIA>
   </GPU>
+  <Config Name="Blurry Tags" Target="BLUR_TAGS" Default="blurry,blur,blurred,out-of-focus,motion blur"
+          Description="Comma-separated tags that put a photo on the Blurry page. Also editable under Settings."
+          Type="Variable" Display="advanced" Required="false" Mask="false">blurry,blur,blurred,out-of-focus,motion blur</Config>
+
 </Container>
